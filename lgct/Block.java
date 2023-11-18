@@ -5,8 +5,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 public class Block{
-    public volatile AtomicInteger type=new AtomicInteger(0);
-    public volatile AtomicBoolean value=new AtomicBoolean(false);
-    public volatile ArrayList<Pos> inPos,outPos;
-    public volatile Lock inPosLock=new ReentrantLock(),outPosLock=new ReentrantLock();
+    public AtomicInteger type=new AtomicInteger(0);
+    public AtomicBoolean value=new AtomicBoolean(false);
+    public ArrayList<Pos> inPos,outPos;
+    public Lock inPosLock=new ReentrantLock(),outPosLock=new ReentrantLock();
 }
