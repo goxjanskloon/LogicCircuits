@@ -1,11 +1,13 @@
 package lgct;
 import java.io.File;
 import java.io.FileReader;
-import java.io.IOException;
+import java.io.FileWriter;
 import java.util.ArrayList;
+import java.util.Scanner;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 public class Board{
     private class flushThreadFactory implements ThreadFactory{
@@ -115,19 +117,68 @@ public class Board{
         flushThreadPool.shutdownNow();
         blocks.clear();
     }
-    void loadFile(File file){
+    boolean loadFile(File file){
+        if(!blocks.isEmpty()) clear();
         FileReader fileReader=null;
         try{
             fileReader=new FileReader(file);
-            String string="";
-            for(int data;(data=fileReader.read())!=-1;){
-
+            Scanner scanner=new Scanner(fileReader);
+            int width=scanner.nextInt(),height=scanner.nextInt();
+            for(int i=0;i<height;i++){
+                blocks.add(new ArrayList<Block>());
+                for(int j=0;j<width;j++){
+                    blocks.getLast().add(new Block(scanner.nextInt(),scanner.nextInt()==1));
+                    Block block=blocks.getLast().getLast();
+                    for(int size=scanner.nextInt();size-->0;) block.inPos.add(new Pos(scanner.nextInt(),scanner.nextInt()));
+                    for(int size=scanner.nextInt();size-->0;) block.outPos.add(new Pos(scanner.nextInt(),scanner.nextInt()));
+                }
             }
+            scanner.close();
         }
-        catch(IOException e){e.printStackTrace();}
+        catch(Exception e){
+            e.printStackTrace();
+            clear();
+            return false;
+        }
         finally{
             try{fileReader.close();}
-            catch(IOException e){e.printStackTrace();}
+            catch(Exception e){e.printStackTrace();}
         }
+        return true;
+    }
+    boolean exportFile(File file){
+        if(!blocks.isEmpty()) clear();
+        FileWriter fileWriter=null;
+        try{
+            fileWriter=new FileWriter(file);
+            fileWriter.write(blocks.size()+" "+blocks.getFirst().size()+" ");
+            for(int i=0;i<blocks.size();i++)
+                for(int j=0;j<blocks.get(i).size();j++){
+                    Block block=blocks.get(i).get(j);
+                    block.inPosLock.lock();
+                    block.outPosLock.lock();
+                    fileWriter.write(block.type.get()+" "+(block.value.get()?1:0)+" "+block.inPos.size()+" "+block.outPos.size()+" ");
+                    for(Pos pos:block.inPos) fileWriter.write(pos.x+" "+pos.y+" ");
+                    block.inPosLock.unlock();
+                    for(Pos pos:block.outPos) fileWriter.write(pos.x+" "+pos.y+" ");
+                    block.outPosLock.unlock();
+                }
+        }
+        catch(Exception e){
+            e.printStackTrace();
+            try{
+                fileWriter.close();
+                fileWriter=new FileWriter(file);
+                fileWriter.write("");
+                fileWriter.flush();
+                fileWriter.close();
+            }
+            catch(Exception e2){e2.printStackTrace();}
+        }
+        finally{
+            try{fileWriter.close();}
+            catch(Exception e){e.printStackTrace();}
+        }
+        return true;
     }
 }
