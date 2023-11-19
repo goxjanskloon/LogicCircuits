@@ -1,4 +1,7 @@
 package lgct;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -111,5 +114,20 @@ public class Board{
     void clear(){
         flushThreadPool.shutdownNow();
         blocks.clear();
+    }
+    void loadFile(File file){
+        FileReader fileReader=null;
+        try{
+            fileReader=new FileReader(file);
+            String string="";
+            for(int data;(data=fileReader.read())!=-1;){
+
+            }
+        }
+        catch(IOException e){e.printStackTrace();}
+        finally{
+            try{fileReader.close();}
+            catch(IOException e){e.printStackTrace();}
+        }
     }
 }
