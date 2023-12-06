@@ -4,74 +4,64 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.util.Scanner;
 import java.util.ArrayList;
-import java.util.Lock;
-import java.util.ReentrantLock;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicBoolean;
 public class Board{
-    public class Pos{
-        public int x,y;
-        public Pos(){x=y=-1;}
-        public Pos(int initX,int initY){x=initX;y=initY;}
-    }
-    private class Block{
-        public AtomicInteger type;
-        public AtomicBoolean value;
-        public ArrayList<Pos> inPos,outPos;
-        public Lock inPosLock=new ReentrantLock(),outPosLock=new ReentrantLock();
-        public Block(){
-            type=new AtomicInteger(0);
-            value=new AtomicBoolean(false);
-        }
-        public Block(int initType,boolean initValue){
-            type=new AtomicInteger(initType);
-            value=new AtomicBoolean(initValue);
-        }
-    }
-    private class flushThreadFactory implements ThreadFactory{
+    private class FlushThreadFactory implements ThreadFactory{
         private AtomicInteger threadIdx=new AtomicInteger(0);
         private String threadNamePrefix;
-        public flushThreadFactory(String Prefix){
+        public FlushThreadFactory(String Prefix){
             threadNamePrefix=Prefix;
         }
-        @Override
         public Thread newThread(Runnable runnable){
             Thread thread=new Thread(runnable);
             thread.setName(threadNamePrefix+"-xxljob-"+threadIdx.getAndIncrement());
             return thread;
         }
     }
+    private class FlushThread implements Runnable{
+        private Pos pos;
+        public FlushThread(Pos argPos){pos=argPos;}
+        public void run(){
+            Block block=getBlock(pos);
+            block.inPosLock.lock();
+            boolean newValue;
+            switch(Block.Type.valueOf(block.type.get())){
+            case Void:newValue=!block.inPos.isEmpty()&&getBlock(block.inPos.getFirst()).value.get();break;
+            case Or:newValue=block.inPos.size()>=2&&(getBlock(block.inPos.getFirst()).value.get()||getBlock(block.inPos.get(1)).value.get());break;
+            case Not:newValue=!block.inPos.isEmpty()&&!getBlock(block.inPos.getFirst()).value.get();break;
+            case And:newValue=block.inPos.size()>=2&&getBlock(block.inPos.getFirst()).value.get()&&getBlock(block.inPos.get(1)).value.get();break;
+            case Xor:newValue=block.inPos.size()>=2&&(getBlock(block.inPos.getFirst()).value.get()^getBlock(block.inPos.get(1)).value.get());break;
+            case Src:newValue=block.value.get();break;
+            default:newValue=false;
+            }
+            block.inPosLock.unlock();
+            if(newValue!=block.value.get()){
+                block.value.set(newValue);
+                block.outPosLock.lock();
+                for(Pos outPos:block.outPos) flushThreadPool.execute(new FlushThread(outPos));
+                block.outPosLock.unlock();
+            }
+        }
+    }
     private ArrayList<ArrayList<Block>> blocks;
-    private ExecutorService flushThreadPool=Executors.newCachedThreadPool(new flushThreadFactory("cachedThread"));
-    private Block get(Pos pos){
+    private ExecutorService flushThreadPool=Executors.newCachedThreadPool(new FlushThreadFactory("cachedThread"));
+    private Block getBlock(Pos pos){
         return blocks.get(pos.x).get(pos.y);
     }
+    public Block.Type getBlockType(Pos pos){
+        return Block.Type.valueOf(getBlock(pos).type.get());
+    }
+    public boolean getBlockValue(Pos pos){
+        return getBlock(pos).value.get();
+    }
     public void flushBlock(Pos pos){
-        Block block=get(pos);
-        block.inPosLock.lock();
-        boolean newValue;
-        switch(block.type.get()){
-        case 0:newValue=!block.inPos.isEmpty()&&get(block.inPos.getFirst()).value.get();break;
-        case 1:newValue=block.inPos.size()>=2&&(get(block.inPos.getFirst()).value.get()||get(block.inPos.get(1)).value.get());break;
-        case 2:newValue=!block.inPos.isEmpty()&&!get(block.inPos.getFirst()).value.get();break;
-        case 3:newValue=block.inPos.size()>=2&&get(block.inPos.getFirst()).value.get()&&get(block.inPos.get(1)).value.get();break;
-        case 4:newValue=block.inPos.size()>=2&&(get(block.inPos.getFirst()).value.get()^get(block.inPos.get(1)).value.get());break;
-        case 5:newValue=block.value.get();break;
-        default:newValue=false;
-        }
-        block.inPosLock.unlock();
-        if(newValue!=block.value.get()){
-            block.value.set(newValue);
-            block.outPosLock.lock();
-            for(Pos outPos:block.outPos) flushThreadPool.submit(()->flushBlock(outPos));
-            block.outPosLock.unlock();
-        }
+        flushThreadPool.execute(new FlushThread(pos));
     }
     public boolean setType(Pos pos,int type){
-        Block block=get(pos);
+        Block block=getBlock(pos);
         if(type!=block.type.get()){
             block.type.set(type);
             flushBlock(pos);
@@ -80,7 +70,7 @@ public class Board{
         return false;
     }
     public boolean linkBlocks(Pos lPos,Pos rPos){
-        Block lBlock=get(lPos),rBlock=get(rPos);
+        Block lBlock=getBlock(lPos),rBlock=getBlock(rPos);
         lBlock.outPosLock.lock();
         for(Pos outPos:lBlock.outPos)
             if(outPos==rPos){
@@ -94,8 +84,14 @@ public class Board{
         rBlock.inPosLock.unlock();
         return true;
     }
+    boolean setSrcValue(Pos pos,boolean value){
+        Block block=getBlock(pos);
+        if(Block.Type.valueOf(block.type.get())!=Block.Type.Src||block.value.get()==value) return false;
+        block.value.set(value);
+        return true; 
+    }
     public boolean clearBlock(Pos pos){
-        Block block=get(pos);
+        Block block=getBlock(pos);
         block.inPosLock.lock();
         block.outPosLock.lock();
         if(block.type.get()==0)
@@ -107,7 +103,7 @@ public class Board{
                 }
                 else{
                     for(Pos outPos:block.outPos){
-                        Block outBlock=get(outPos);
+                        Block outBlock=getBlock(outPos);
                         outBlock.inPosLock.lock();
                         for(int i=0;i<outBlock.inPos.size();i++)
                             if(outBlock.inPos.get(i)==pos){
@@ -120,7 +116,7 @@ public class Board{
                 }
             else{
                 for(Pos inPos:block.inPos){
-                    Block inBlock=get(inPos);
+                    Block inBlock=getBlock(inPos);
                     inBlock.outPosLock.lock();
                     for(int i=0;i<inBlock.outPos.size();i++)
                         if(inBlock.outPos.get(i)==pos){
@@ -166,10 +162,6 @@ public class Board{
             catch(Exception e){e.printStackTrace();}
         }
         return true;
-    }
-    boolean changeSrcStatus(Pos pos,boolean status){
-        Block block=get(pos);
-        if()
     }
     boolean exportFile(File file){
         if(!blocks.isEmpty()) clear();
