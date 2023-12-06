@@ -1,4 +1,4 @@
-package lgct;
+package org.goxjanskloon.lgct;
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -9,9 +9,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 public class Board{
-    private class FlushThreadFactory implements ThreadFactory{
-        private AtomicInteger threadIdx=new AtomicInteger(0);
-        private String threadNamePrefix;
+    class FlushThreadFactory implements ThreadFactory{
+        AtomicInteger threadIdx=new AtomicInteger(0);
+        String threadNamePrefix;
         public FlushThreadFactory(String Prefix){
             threadNamePrefix=Prefix;
         }
@@ -21,8 +21,8 @@ public class Board{
             return thread;
         }
     }
-    private class FlushThread implements Runnable{
-        private Pos pos;
+    class FlushThread implements Runnable{
+        Pos pos;
         public FlushThread(Pos argPos){pos=argPos;}
         public void run(){
             Block block=getBlock(pos);
@@ -46,9 +46,9 @@ public class Board{
             }
         }
     }
-    private ArrayList<ArrayList<Block>> blocks;
-    private ExecutorService flushThreadPool=Executors.newCachedThreadPool(new FlushThreadFactory("cachedThread"));
-    private Block getBlock(Pos pos){
+    ArrayList<ArrayList<Block>> blocks;
+    ExecutorService flushThreadPool=Executors.newCachedThreadPool(new FlushThreadFactory("cachedThread"));
+    Block getBlock(Pos pos){
         return blocks.get(pos.x).get(pos.y);
     }
     public Block.Type getBlockType(Pos pos){
