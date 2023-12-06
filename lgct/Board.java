@@ -2,13 +2,35 @@ package lgct;
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
-import java.util.ArrayList;
 import java.util.Scanner;
+import java.util.ArrayList;
+import java.util.Lock;
+import java.util.ReentrantLock;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicBoolean;
 public class Board{
+    public class Pos{
+        public int x,y;
+        public Pos(){x=y=-1;}
+        public Pos(int initX,int initY){x=initX;y=initY;}
+    }
+    private class Block{
+        public AtomicInteger type;
+        public AtomicBoolean value;
+        public ArrayList<Pos> inPos,outPos;
+        public Lock inPosLock=new ReentrantLock(),outPosLock=new ReentrantLock();
+        public Block(){
+            type=new AtomicInteger(0);
+            value=new AtomicBoolean(false);
+        }
+        public Block(int initType,boolean initValue){
+            type=new AtomicInteger(initType);
+            value=new AtomicBoolean(initValue);
+        }
+    }
     private class flushThreadFactory implements ThreadFactory{
         private AtomicInteger threadIdx=new AtomicInteger(0);
         private String threadNamePrefix;
@@ -24,7 +46,7 @@ public class Board{
     }
     private ArrayList<ArrayList<Block>> blocks;
     private ExecutorService flushThreadPool=Executors.newCachedThreadPool(new flushThreadFactory("cachedThread"));
-    public Block get(Pos pos){
+    private Block get(Pos pos){
         return blocks.get(pos.x).get(pos.y);
     }
     public void flushBlock(Pos pos){
