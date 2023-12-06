@@ -167,6 +167,10 @@ public class Board{
         }
         return true;
     }
+    boolean changeSrcStatus(Pos pos,boolean status){
+        Block block=get(pos);
+        if()
+    }
     boolean exportFile(File file){
         if(!blocks.isEmpty()) clear();
         FileWriter fileWriter=null;
