@@ -1,4 +1,4 @@
-package lgct;
+package org.goxjanskloon.lgct;
 public class Pos{
     public int x,y;
     public Pos(){x=y=-1;}
