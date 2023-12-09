@@ -27,6 +27,14 @@ public class Board{
     public Block get(Pos pos){
         return blocks.get(pos.x).get(pos.y);
     }
+    public boolean initBlank(int width,int height){
+        if(!clear()) return false;
+        for(int i=0;i<height;i++){
+            blocks.add(new ArrayList<Block>());
+            for(int j=0;j<width;j++) blocks.getLast().add(new Block());
+        }
+        return true;
+    }
     public void flushBlock(Pos pos){
         Block block=get(pos);
         block.inPosLock.lock();
@@ -112,9 +120,11 @@ public class Board{
         else block.type.set(0);
         return true;
     }
-    void clear(){
+    boolean clear(){
+        if(blocks.isEmpty()) return false;
         flushThreadPool.shutdownNow();
         blocks.clear();
+        return true;
     }
     boolean loadFile(File file){
         if(!blocks.isEmpty()) clear();
