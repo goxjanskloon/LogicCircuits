@@ -1,6 +1,6 @@
-import org.goxjanskloon.lgct.Board;
-import org.goxjanskloon.lgct.BoardUI;
 import org.eclipse.swt.widgets.Display;
+import org.goxjanskloon.logiccircuits.Board;
+import org.goxjanskloon.logiccircuits.BoardUI;
 public class LogicCircuits{
     public static void main(String[] args){
         Display display=new Display();

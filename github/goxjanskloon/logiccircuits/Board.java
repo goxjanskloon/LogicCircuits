@@ -1,4 +1,4 @@
-package org.goxjanskloon.lgct;
+package org.goxjanskloon.logiccircuits;
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -18,9 +18,7 @@ public class Board{
     }
     class Block{
         public enum Type{
-            Void(0),Or(1),Not(2),And(3),Xor(4),Src(5);
-            private final int value;
-            private Type(int argValue){value=argValue;}
+            Void(),Or(),Not(),And(),Xor(),Src();
             public static Type valueOf(int value){
                 switch(value){
                 case 0:return Void;
@@ -32,35 +30,18 @@ public class Board{
                 default:return null;
                 }
             }
-            public int getValue(){return value;}
         }
-        public AtomicInteger type;
-        public AtomicBoolean value;
-        public CopyOnWriteArrayList<Pos> inPos,outPos;
-        public Block(){
-            type=new AtomicInteger(0);
-            value=new AtomicBoolean(false);
-        }
+        private AtomicInteger type;
+        private AtomicBoolean value;
+        private CopyOnWriteArrayList<Pos> inPos,outPos;
         public Block(int initType,boolean initValue){
             type=new AtomicInteger(initType);
             value=new AtomicBoolean(initValue);
         }
     }
-    class FlushThreadFactory implements ThreadFactory{
-        AtomicInteger threadIdx=new AtomicInteger(0);
-        String threadNamePrefix;
-        public FlushThreadFactory(String Prefix){
-            threadNamePrefix=Prefix;
-        }
-        public Thread newThread(Runnable runnable){
-            Thread thread=new Thread(runnable);
-            thread.setName(threadNamePrefix+"-xxljob-"+threadIdx.getAndIncrement());
-            return thread;
-        }
-    }
-    class FlushThread implements Runnable{
+    private class FlushBlock implements Runnable{
         Pos pos;
-        public FlushThread(Pos argPos){pos=argPos;}
+        public FlushBlock(Pos argPos){pos=argPos;}
         public void run(){
             Block block=getBlock(pos);
             boolean newValue;
@@ -75,12 +56,14 @@ public class Board{
             }
             if(newValue!=block.value.get()){
                 block.value.set(newValue);
-                for(Pos outPos:block.outPos) flushThreadPool.execute(new FlushThread(outPos));
+                for(Pos outPos:block.outPos) threadPool.execute(new FlushBlock(outPos));
             }
         }
     }
-    ArrayList<ArrayList<Block>> blocks;
-    ExecutorService flushThreadPool=Executors.newCachedThreadPool(new FlushThreadFactory("cachedThread"));
+    private ArrayList<ArrayList<Block>> blocks;
+    private ExecutorService threadPool=Executors.newCachedThreadPool(new ThreadFactory(){
+        public Thread newThread(Runnable runnable){return new Thread(runnable);}
+    });
     Block getBlock(Pos pos){
         return blocks.get(pos.x).get(pos.y);
     }
@@ -88,18 +71,24 @@ public class Board{
     public int getWidth(){return blocks.size();}
     public int getHeight(){
         if(isEmpty()) return 0;
-        return blocks.get(0).size();
+        return blocks.getFirst().size();
     }
     public Block.Type getBlockType(Pos pos){
         return Block.Type.valueOf(getBlock(pos).type.get());
     }
+    public Block.Type getBlockType(Block block){
+        return Block.Type.valueOf(block.type.get());
+    }
     public boolean getBlockValue(Pos pos){
         return getBlock(pos).value.get();
     }
-    public void flushBlock(Pos pos){
-        flushThreadPool.execute(new FlushThread(pos));
+    public boolean getBlockValue(Block block){
+        return block.value.get();
     }
-    public boolean setType(Pos pos,int type){
+    public void flushBlock(Pos pos){
+        threadPool.execute(new FlushBlock(pos));
+    }
+    public boolean setBlockType(Pos pos,int type){
         Block block=getBlock(pos);
         if(type!=block.type.get()){
             block.type.set(type);
@@ -116,7 +105,7 @@ public class Board{
         rBlock.inPos.add(lPos);
         return true;
     }
-    boolean setSrcValue(Pos pos,boolean value){
+    public boolean setSrcValue(Pos pos,boolean value){
         Block block=getBlock(pos);
         if(Block.Type.valueOf(block.type.get())!=Block.Type.Src||block.value.get()==value) return false;
         block.value.set(value);
@@ -152,11 +141,14 @@ public class Board{
         else block.type.set(0);
         return true;
     }
-    void clear(){
-        flushThreadPool.shutdownNow();
+    public boolean clear(){
+        if(isEmpty()) return false;
+        threadPool.shutdownNow();
         blocks.clear();
+        return true;
     }
-    boolean loadFile(File file){
+    public void silence(){threadPool.shutdownNow();}
+    public boolean loadFile(File file){
         if(!blocks.isEmpty()) clear();
         FileReader fileReader=null;
         try{
@@ -185,7 +177,7 @@ public class Board{
         }
         return true;
     }
-    boolean exportFile(File file){
+    public boolean exportFile(File file){
         if(!blocks.isEmpty()) clear();
         FileWriter fileWriter=null;
         try{
