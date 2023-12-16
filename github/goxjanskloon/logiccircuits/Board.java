@@ -11,12 +11,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 public class Board{
-    public class Pos{
-        public int x,y;
-        public Pos(){x=y=-1;}
-        public Pos(int initX,int initY){x=initX;y=initY;}
-    }
-    class Block{
+    public class Block{
         public enum Type{
             Void(),Or(),Not(),And(),Xor(),Src();
             public static Type valueOf(int value){
@@ -31,116 +26,58 @@ public class Board{
                 }
             }
         }
+        public final int x,y;
         private AtomicInteger type;
         private AtomicBoolean value;
-        private CopyOnWriteArrayList<Pos> inPos,outPos;
-        public Block(int initType,boolean initValue){
-            type=new AtomicInteger(initType);
-            value=new AtomicBoolean(initValue);
+        private CopyOnWriteArrayList<Block> input,output;
+        private Block(int type,boolean value,int x,int y){
+            this.x=x;this.y=y;
+            this.type=new AtomicInteger(type);
+            this.value=new AtomicBoolean(value);
         }
-    }
-    private class FlushBlock implements Runnable{
-        Pos pos;
-        public FlushBlock(Pos argPos){pos=argPos;}
-        public void run(){
-            Block block=getBlock(pos);
+        public Type getType(){return Type.valueOf(type.get());}
+        public boolean getValue(){return value.get();}
+        public void flush(){
+            threadPool.execute(new Runnable(){public void run(){
             boolean newValue;
-            switch(Block.Type.valueOf(block.type.get())){
-            case Void:newValue=!block.inPos.isEmpty()&&getBlock(block.inPos.getFirst()).value.get();break;
-            case Or:newValue=block.inPos.size()>=2&&(getBlock(block.inPos.getFirst()).value.get()||getBlock(block.inPos.get(1)).value.get());break;
-            case Not:newValue=!block.inPos.isEmpty()&&!getBlock(block.inPos.getFirst()).value.get();break;
-            case And:newValue=block.inPos.size()>=2&&getBlock(block.inPos.getFirst()).value.get()&&getBlock(block.inPos.get(1)).value.get();break;
-            case Xor:newValue=block.inPos.size()>=2&&(getBlock(block.inPos.getFirst()).value.get()^getBlock(block.inPos.get(1)).value.get());break;
-            case Src:newValue=block.value.get();break;
+            switch(Block.Type.valueOf(type.get())){
+            case Void:newValue=!input.isEmpty()&&input.getFirst().value.get();break;
+            case Or:newValue=input.size()>=2&&(input.getFirst().value.get()||input.get(1).value.get());break;
+            case Not:newValue=!input.isEmpty()&&!input.getFirst().value.get();break;
+            case And:newValue=input.size()>=2&&input.getFirst().value.get()&&input.get(1).value.get();break;
+            case Xor:newValue=input.size()>=2&&input.getFirst().value.get()^input.get(1).value.get();break;
+            case Src:newValue=value.get();break;
             default:newValue=false;
             }
-            if(newValue!=block.value.get()){
-                block.value.set(newValue);
-                for(Pos outPos:block.outPos) threadPool.execute(new FlushBlock(outPos));
-            }
+            if(value.compareAndSet(!newValue,newValue))
+                for(Block b:output) b.flush();
+        }});}
+        public boolean linkTo(Block block){
+            if(output.contains(block)) return false;
+            output.add(block);
+            block.input.add(this);
+            return true;
+        }
+        public boolean exchangeValue(){
+            if(getType()!=Type.Src) throw new UnsupportedOperationException("Calling exchangeValue() on a not Src-Type Block");
+            return !value.getAndSet(!getValue());
+        }
+        public boolean isEmpty(){
+            return getType()==Type.Void&&input.isEmpty()&&output.isEmpty();
+        }
+        public boolean clear(){
+            if(isEmpty()) return false;
+            input.clear();output.clear();type.set(Type.Void.ordinal());
+            return true;
         }
     }
     private ArrayList<ArrayList<Block>> blocks;
     private ExecutorService threadPool=Executors.newCachedThreadPool(new ThreadFactory(){
-        public Thread newThread(Runnable runnable){return new Thread(runnable);}
+        public Thread newThread(Runnable r){return new Thread(r);}
     });
-    Block getBlock(Pos pos){
-        return blocks.get(pos.x).get(pos.y);
-    }
     public boolean isEmpty(){return blocks.isEmpty();}
     public int getWidth(){return blocks.size();}
-    public int getHeight(){
-        if(isEmpty()) return 0;
-        return blocks.getFirst().size();
-    }
-    public Block.Type getBlockType(Pos pos){
-        return Block.Type.valueOf(getBlock(pos).type.get());
-    }
-    public Block.Type getBlockType(Block block){
-        return Block.Type.valueOf(block.type.get());
-    }
-    public boolean getBlockValue(Pos pos){
-        return getBlock(pos).value.get();
-    }
-    public boolean getBlockValue(Block block){
-        return block.value.get();
-    }
-    public void flushBlock(Pos pos){
-        threadPool.execute(new FlushBlock(pos));
-    }
-    public boolean setBlockType(Pos pos,int type){
-        Block block=getBlock(pos);
-        if(type!=block.type.get()){
-            block.type.set(type);
-            flushBlock(pos);
-            return true;
-        }
-        return false;
-    }
-    public boolean linkBlocks(Pos lPos,Pos rPos){
-        Block lBlock=getBlock(lPos),rBlock=getBlock(rPos);
-        for(Pos outPos:lBlock.outPos)
-            if(outPos==rPos) return false;
-        lBlock.outPos.add(rPos);
-        rBlock.inPos.add(lPos);
-        return true;
-    }
-    public boolean setSrcValue(Pos pos,boolean value){
-        Block block=getBlock(pos);
-        if(Block.Type.valueOf(block.type.get())!=Block.Type.Src||block.value.get()==value) return false;
-        block.value.set(value);
-        return true; 
-    }
-    public boolean clearBlock(Pos pos){
-        Block block=getBlock(pos);
-        if(block.type.get()==0)
-            if(block.inPos.isEmpty())
-                if(block.outPos.isEmpty()) return false;
-                else{
-                    for(Pos outPos:block.outPos){
-                        Block outBlock=getBlock(outPos);
-                        for(int i=0;i<outBlock.inPos.size();i++)
-                            if(outBlock.inPos.get(i)==pos){
-                                outBlock.inPos.remove(i);
-                                break;
-                            }
-                    }
-                    block.outPos.clear();
-                }
-            else{
-                for(Pos inPos:block.inPos){
-                    Block inBlock=getBlock(inPos);
-                    for(int i=0;i<inBlock.outPos.size();i++)
-                        if(inBlock.outPos.get(i)==pos){
-                            inBlock.outPos.remove(i);
-                            break;
-                        }
-                }
-                block.inPos.clear();
-            }
-        else block.type.set(0);
-        return true;
-    }
+    public int getHeight(){return isEmpty()?0:blocks.getFirst().size();}
     public boolean clear(){
         if(isEmpty()) return false;
         threadPool.shutdownNow();
@@ -158,12 +95,15 @@ public class Board{
             for(int i=0;i<height;i++){
                 blocks.add(new ArrayList<Block>());
                 for(int j=0;j<width;j++){
-                    blocks.getLast().add(new Block(scanner.nextInt(),scanner.nextInt()==1));
-                    Block block=blocks.getLast().getLast();
-                    for(int size=scanner.nextInt();size-->0;) block.inPos.add(new Pos(scanner.nextInt(),scanner.nextInt()));
-                    for(int size=scanner.nextInt();size-->0;) block.outPos.add(new Pos(scanner.nextInt(),scanner.nextInt()));
+                    blocks.getLast().add(new Block(scanner.nextInt(),scanner.nextInt()==1,i,j));
                 }
             }
+            for(int i=0;i<height;i++)
+                for(int j=0;j<width;j++){
+                    Block block=blocks.get(i).get(j);
+                    for(int inputSize=scanner.nextInt();inputSize-->0;) block.input.add(blocks.get(scanner.nextInt()).get(scanner.nextInt()));
+                    for(int outputSize=scanner.nextInt();outputSize-->0;) block.output.add(blocks.get(scanner.nextInt()).get(scanner.nextInt()));
+                }
             scanner.close();
         }
         catch(Exception e){
@@ -186,9 +126,14 @@ public class Board{
             for(int i=0;i<blocks.size();i++)
                 for(int j=0;j<blocks.get(i).size();j++){
                     Block block=blocks.get(i).get(j);
-                    fileWriter.write(block.type.get()+" "+(block.value.get()?1:0)+" "+block.inPos.size()+" "+block.outPos.size()+" ");
-                    for(Pos pos:block.inPos) fileWriter.write(pos.x+" "+pos.y+" ");
-                    for(Pos pos:block.outPos) fileWriter.write(pos.x+" "+pos.y+" ");
+                    fileWriter.write(block.type.get()+" "+(block.value.get()?1:0)+" ");
+                }
+            for(int i=0;i<blocks.size();i++)
+                for(int j=0;j<blocks.get(i).size();j++){
+                    Block block=blocks.get(i).get(j);
+                    fileWriter.write(block.input.size()+" "+block.output.size()+" ");
+                    for(Block b:block.input) fileWriter.write(b.x+" "+b.y+" ");
+                    for(Block b:block.output) fileWriter.write(b.x+" "+b.y+" ");
                 }
         }
         catch(Exception e){

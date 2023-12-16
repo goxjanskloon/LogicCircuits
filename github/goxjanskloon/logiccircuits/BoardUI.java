@@ -1,7 +1,7 @@
 package github.goxjanskloon.logiccircuits;
-import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swt.events.PaintEvent;
 import org.eclipse.swt.events.PaintListener;
+import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swt.widgets.Display;
 public class BoardUI implements Runnable{
     Board board;
@@ -17,10 +17,9 @@ public class BoardUI implements Runnable{
         });
         shell.open();
     }
-    void paintBlock(Board.Pos pos){
-        Board.Block block=board.getBlock(pos);
-        int x=pos.x*blockSize+xOffset,y=pos.y*blockSize+yOffset;
-        switch(board.getBlockType(block)){
+    void paintBlock(Board.Block block){
+        int x=block.x*blockSize+xOffset,y=block.y*blockSize+yOffset;
+        switch(block.getType()){
         case And:
             
             break;
