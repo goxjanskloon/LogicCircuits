@@ -1,4 +1,4 @@
-package org.goxjanskloon.logiccircuits;
+package github.goxjanskloon.logiccircuits;
 import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swt.events.PaintEvent;
 import org.eclipse.swt.events.PaintListener;
