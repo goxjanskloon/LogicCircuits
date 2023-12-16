@@ -1,7 +1,6 @@
 package github.goxjanskloon.logiccircuits;
-import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
+import java.io.Reader;
+import java.io.Writer;
 import java.util.Scanner;
 import java.util.ArrayList;
 import java.util.concurrent.Executors;
@@ -71,10 +70,13 @@ public class Board{
             return true;
         }
     }
-    private ArrayList<ArrayList<Block>> blocks;
+    ArrayList<ArrayList<Block>> blocks;
     private ExecutorService threadPool=Executors.newCachedThreadPool(new ThreadFactory(){
-        public Thread newThread(Runnable r){return new Thread(r);}
-    });
+        public Thread newThread(Runnable r){
+            Thread thread=new Thread(r);
+            thread.setDaemon(true);
+            return thread;
+        }});
     public boolean isEmpty(){return blocks.isEmpty();}
     public int getWidth(){return blocks.size();}
     public int getHeight(){return isEmpty()?0:blocks.getFirst().size();}
@@ -85,72 +87,45 @@ public class Board{
         return true;
     }
     public void silence(){threadPool.shutdownNow();}
-    public boolean loadFile(File file){
-        if(!blocks.isEmpty()) clear();
-        FileReader fileReader=null;
-        try{
-            fileReader=new FileReader(file);
-            Scanner scanner=new Scanner(fileReader);
-            int width=scanner.nextInt(),height=scanner.nextInt();
-            for(int i=0;i<height;i++){
-                blocks.add(new ArrayList<Block>());
-                for(int j=0;j<width;j++){
-                    blocks.getLast().add(new Block(scanner.nextInt(),scanner.nextInt()==1,i,j));
-                }
+    public boolean loadFrom(Reader reader){
+        clear();try{
+        Scanner scanner=new Scanner(reader);
+        int width=scanner.nextInt(),height=scanner.nextInt();
+        for(int i=0;i<height;i++){
+            blocks.add(new ArrayList<Block>());
+            for(int j=0;j<width;j++){
+                blocks.getLast().add(new Block(scanner.nextInt(),scanner.nextInt()==1,i,j));
             }
-            for(int i=0;i<height;i++)
-                for(int j=0;j<width;j++){
-                    Block block=blocks.get(i).get(j);
-                    for(int inputSize=scanner.nextInt();inputSize-->0;) block.input.add(blocks.get(scanner.nextInt()).get(scanner.nextInt()));
-                    for(int outputSize=scanner.nextInt();outputSize-->0;) block.output.add(blocks.get(scanner.nextInt()).get(scanner.nextInt()));
-                }
-            scanner.close();
         }
-        catch(Exception e){
+        for(int i=0;i<height;i++)
+            for(int j=0;j<width;j++){
+                Block block=blocks.get(i).get(j);
+                for(int inputSize=scanner.nextInt();inputSize-->0;) block.input.add(blocks.get(scanner.nextInt()).get(scanner.nextInt()));
+                for(int outputSize=scanner.nextInt();outputSize-->0;) block.output.add(blocks.get(scanner.nextInt()).get(scanner.nextInt()));
+            }
+        scanner.close();
+        }catch(Exception e){
             e.printStackTrace();
             clear();
             return false;
         }
-        finally{
-            try{fileReader.close();}
-            catch(Exception e){e.printStackTrace();}
-        }
         return true;
     }
-    public boolean exportFile(File file){
-        if(!blocks.isEmpty()) clear();
-        FileWriter fileWriter=null;
-        try{
-            fileWriter=new FileWriter(file);
-            fileWriter.write(blocks.size()+" "+blocks.getFirst().size()+" ");
-            for(int i=0;i<blocks.size();i++)
-                for(int j=0;j<blocks.get(i).size();j++){
-                    Block block=blocks.get(i).get(j);
-                    fileWriter.write(block.type.get()+" "+(block.value.get()?1:0)+" ");
-                }
-            for(int i=0;i<blocks.size();i++)
-                for(int j=0;j<blocks.get(i).size();j++){
-                    Block block=blocks.get(i).get(j);
-                    fileWriter.write(block.input.size()+" "+block.output.size()+" ");
-                    for(Block b:block.input) fileWriter.write(b.x+" "+b.y+" ");
-                    for(Block b:block.output) fileWriter.write(b.x+" "+b.y+" ");
-                }
-        }
-        catch(Exception e){
-            e.printStackTrace();
-            try{
-                fileWriter.close();
-                fileWriter=new FileWriter(file);
-                fileWriter.write("");
-                fileWriter.flush();
-                fileWriter.close();
+    public boolean exportTo(Writer writer){try{
+        writer.write(blocks.size()+" "+blocks.getFirst().size()+" ");
+        for(int i=0;i<blocks.size();i++)
+            for(int j=0;j<blocks.get(i).size();j++){
+                Block block=blocks.get(i).get(j);
+                writer.write(block.type.get()+" "+(block.value.get()?1:0)+" ");
             }
-            catch(Exception e2){e2.printStackTrace();}
-        }
-        finally{
-            try{fileWriter.close();}
-            catch(Exception e){e.printStackTrace();}
-        }
+        for(int i=0;i<blocks.size();i++)
+            for(int j=0;j<blocks.get(i).size();j++){
+                Block block=blocks.get(i).get(j);
+                writer.write(block.input.size()+" "+block.output.size()+" ");
+                for(Block b:block.input) writer.write(b.x+" "+b.y+" ");
+                for(Block b:block.output) writer.write(b.x+" "+b.y+" ");
+            }
+        }catch(Exception e){e.printStackTrace();return false;}
         return true;
     }
 }
