@@ -37,10 +37,8 @@ public class BoardUI implements Runnable{
         if(xl<0) xl=0;if(yl<0) yl=0;if(xr>=board.getWidth()) xr=board.getWidth();if(yr>=board.getHeight()) yr=board.getHeight();
         for(int i=0;i<=yr-yl;i++)
             for(int j=0;j<=xr-xl;j++) paint(board.blocks.get(i).get(j));
-            
         return true;
     }
-    public void run(){//TODO:Paint UI and process operations from user
-
+    public void run(){
     }
 }
