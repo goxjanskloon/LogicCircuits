@@ -28,13 +28,17 @@ public class Board{
         public final int x,y;
         private AtomicInteger type;
         private AtomicBoolean value;
-        private CopyOnWriteArrayList<Block> input,output;
+        private CopyOnWriteArrayList<Block> input=new CopyOnWriteArrayList<Block>(),output=new CopyOnWriteArrayList<Block>();
         private Block(int type,boolean value,int x,int y){
             this.x=x;this.y=y;
             this.type=new AtomicInteger(type);
             this.value=new AtomicBoolean(value);
         }
         public Type getType(){return Type.valueOf(type.get());}
+        public boolean setType(int type){
+            if(this.type.get()==type) return false;
+            this.type.set(type);return true;
+        }
         public boolean getValue(){return value.get();}
         public void flush(){
             threadPool.execute(new Runnable(){public void run(){
@@ -70,13 +74,16 @@ public class Board{
             return true;
         }
     }
-    ArrayList<ArrayList<Block>> blocks;
+    ArrayList<ArrayList<Block>> blocks=new ArrayList<ArrayList<Block>>();
     private ExecutorService threadPool=Executors.newCachedThreadPool(new ThreadFactory(){
         public Thread newThread(Runnable r){
             Thread thread=new Thread(r);
             thread.setDaemon(true);
             return thread;
         }});
+    public Board(){}
+    public Board(int width,int height){setSize(width, height);}
+    public Block getBlock(int x,int y){return blocks.get(x).get(y);}
     public boolean isEmpty(){return blocks.isEmpty();}
     public int getWidth(){return blocks.size();}
     public int getHeight(){return isEmpty()?0:blocks.getFirst().size();}
@@ -99,7 +106,7 @@ public class Board{
         }
         for(int i=0;i<height;i++)
             for(int j=0;j<width;j++){
-                Block block=blocks.get(i).get(j);
+                Block block=getBlock(i,j);
                 for(int inputSize=scanner.nextInt();inputSize-->0;) block.input.add(blocks.get(scanner.nextInt()).get(scanner.nextInt()));
                 for(int outputSize=scanner.nextInt();outputSize-->0;) block.output.add(blocks.get(scanner.nextInt()).get(scanner.nextInt()));
             }
@@ -115,12 +122,12 @@ public class Board{
         writer.write(blocks.size()+" "+blocks.getFirst().size()+" ");
         for(int i=0;i<blocks.size();i++)
             for(int j=0;j<blocks.get(i).size();j++){
-                Block block=blocks.get(i).get(j);
+                Block block=getBlock(i,j);
                 writer.write(block.type.get()+" "+(block.value.get()?1:0)+" ");
             }
         for(int i=0;i<blocks.size();i++)
             for(int j=0;j<blocks.get(i).size();j++){
-                Block block=blocks.get(i).get(j);
+                Block block=getBlock(i,j);
                 writer.write(block.input.size()+" "+block.output.size()+" ");
                 for(Block b:block.input) writer.write(b.x+" "+b.y+" ");
                 for(Block b:block.output) writer.write(b.x+" "+b.y+" ");
@@ -128,4 +135,12 @@ public class Board{
         }catch(Exception e){e.printStackTrace();return false;}
         return true;
     }
+    public void setSize(int width,int height){
+        clear();
+        for(int i=0;i<height;i++){
+            blocks.add(new ArrayList<Block>());
+            for(int j=0;j<width;j++) blocks.getLast().add(new Block(Block.Type.Void.ordinal(),false,i,j));
+        }
+    }
+    protected void finalize(){clear();}
 }
