@@ -37,7 +37,7 @@ public class Board{
         public Type getType(){return Type.valueOf(type.get());}
         public boolean setType(int type){
             if(this.type.get()==type) return false;
-            this.type.set(type);return true;
+            this.type.set(type);flush();return true;
         }
         public boolean getValue(){return value.get();}
         public void flush(){
@@ -59,17 +59,22 @@ public class Board{
             if(output.contains(block)) return false;
             output.add(block);
             block.input.add(this);
+            flush();
             return true;
         }
         public boolean exchangeValue(){
             if(getType()!=Type.Src) throw new UnsupportedOperationException("Calling exchangeValue() on a not Src-Type Block");
-            return !value.getAndSet(!getValue());
+            boolean result=!value.getAndSet(!getValue());
+            flush();
+            return result;
         }
         public boolean isEmpty(){
             return getType()==Type.Void&&input.isEmpty()&&output.isEmpty();
         }
         public boolean clear(){
             if(isEmpty()) return false;
+            for(Block block:input) block.output.remove(this);
+            for(Block block:output){block.input.remove(this);block.flush();}
             input.clear();output.clear();type.set(Type.Void.ordinal());
             return true;
         }
