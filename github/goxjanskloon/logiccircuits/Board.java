@@ -1,26 +1,25 @@
 package github.goxjanskloon.logiccircuits;
-import java.io.Reader;
 import java.io.Writer;
-import java.util.Scanner;
 import java.util.ArrayList;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ExecutorService;
+import java.util.Scanner;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 public class Board{
     public class Block{
         public enum Type{
-            Void(),Or(),Not(),And(),Xor(),Src();
+            VOID(),OR(),NOT(),AND(),XOR(),SRC();
             public static Type valueOf(int value){
                 switch(value){
-                case 0:return Void;
-                case 1:return Or;
-                case 2:return Not;
-                case 3:return And;
-                case 4:return Xor;
-                case 5:return Src;
+                case 0:return VOID;
+                case 1:return OR;
+                case 2:return NOT;
+                case 3:return AND;
+                case 4:return XOR;
+                case 5:return SRC;
                 default:return null;
         }}}
         public final int x,y;
@@ -32,6 +31,8 @@ public class Board{
             this.type=new AtomicInteger(type);
             this.value=new AtomicBoolean(value);
         }
+        public Block[] getInputBlocks(){return (Block[])input.toArray();}
+        public Block[] getOutputBlocks(){return (Block[])output.toArray();}
         public Type getType(){return Type.valueOf(type.get());}
         public boolean setType(int type){
             if(this.type.get()==type) return false;
@@ -42,12 +43,12 @@ public class Board{
             threadPool.execute(new Runnable(){public void run(){
             boolean newValue;
             switch(Block.Type.valueOf(type.get())){
-            case Void:newValue=!input.isEmpty()&&input.getFirst().value.get();break;
-            case Or:newValue=input.size()>=2&&(input.getFirst().value.get()||input.get(1).value.get());break;
-            case Not:newValue=!input.isEmpty()&&!input.getFirst().value.get();break;
-            case And:newValue=input.size()>=2&&input.getFirst().value.get()&&input.get(1).value.get();break;
-            case Xor:newValue=input.size()>=2&&input.getFirst().value.get()^input.get(1).value.get();break;
-            case Src:newValue=value.get();break;
+            case VOID:newValue=!input.isEmpty()&&input.getFirst().value.get();break;
+            case OR:newValue=input.size()>=2&&(input.getFirst().value.get()||input.get(1).value.get());break;
+            case NOT:newValue=!input.isEmpty()&&!input.getFirst().value.get();break;
+            case AND:newValue=input.size()>=2&&input.getFirst().value.get()&&input.get(1).value.get();break;
+            case XOR:newValue=input.size()>=2&&input.getFirst().value.get()^input.get(1).value.get();break;
+            case SRC:newValue=value.get();break;
             default:newValue=false;
             }
             if(value.compareAndSet(!newValue,newValue))
@@ -61,19 +62,19 @@ public class Board{
             return true;
         }
         public boolean exchangeValue(){
-            if(getType()!=Type.Src) throw new UnsupportedOperationException("Calling exchangeValue() on a not Src-Type Block");
+            if(getType()!=Type.SRC) throw new UnsupportedOperationException("Calling exchangeValue() on a not SRC-Type Block");
             boolean result=!value.getAndSet(!getValue());
             for(Block block:output) block.flush();
             return result;
         }
         public boolean isEmpty(){
-            return getType()==Type.Void&&input.isEmpty()&&output.isEmpty();
+            return getType()==Type.VOID&&input.isEmpty()&&output.isEmpty();
         }
         public boolean clear(){
             if(isEmpty()) return false;
             for(Block block:input) block.output.remove(this);
             for(Block block:output){block.input.remove(this);block.flush();}
-            input.clear();output.clear();type.set(Type.Void.ordinal());
+            input.clear();output.clear();type.set(Type.VOID.ordinal());
             return true;
         }
     }
@@ -141,7 +142,7 @@ public class Board{
         clear();
         for(int i=0;i<height;i++){
             blocks.add(new ArrayList<Block>());
-            for(int j=0;j<width;j++) blocks.getLast().add(new Block(Block.Type.Void.ordinal(),false,i,j));
+            for(int j=0;j<width;j++) blocks.getLast().add(new Block(Block.Type.VOID.ordinal(),false,i,j));
         }
     }
     protected void finalize(){clear();}

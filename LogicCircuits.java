@@ -1,37 +1,38 @@
-import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.KeyEvent;
-import org.eclipse.swt.events.KeyListener;
 import org.eclipse.swt.events.MouseEvent;
+import org.eclipse.swt.events.KeyListener;
 import org.eclipse.swt.events.MouseListener;
 import org.eclipse.swt.events.MouseMoveListener;
-import org.eclipse.swt.widgets.DirectoryDialog;
-import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Menu;
 import org.eclipse.swt.widgets.Shell;
+import org.eclipse.swt.widgets.Display;
+import org.eclipse.swt.widgets.DirectoryDialog;
 import org.eclipse.swt.graphics.GC;
 import org.eclipse.swt.graphics.Image;
+import org.eclipse.swt.graphics.Color;
 import github.goxjanskloon.swt.utils.MsgBox;
 import github.goxjanskloon.logiccircuits.Board;
-public class LogicCircuits implements Runnable{
+public class LogicCircuits/*  implements Runnable*/{
+    private enum OperationType{LINK,MOVE,SET_TYPE,NONE};
     private static final Image[][] images={
-    {new Image(null,"images/Void0.png"),new Image(null,"images/Void1.png")},
-    {new Image(null,"images/Or0.png"),new Image(null,"images/Or1.png")},
-    {new Image(null,"images/Not0.png"),new Image(null,"images/Not1.png")},
-    {new Image(null,"images/And0.png"),new Image(null,"images/And1.png")},
-    {new Image(null,"images/Xor0.png"),new Image(null,"images/Xor1.png")},
-    {new Image(null,"images/Src0.png"),new Image(null,"images/Src1.png")}};
+    {new Image(null,"images/VOID0.png"),new Image(null,"images/VOID1.png")},
+    {new Image(null,"images/OR0.png"),new Image(null,"images/OR1.png")},
+    {new Image(null,"images/NOT0.png"),new Image(null,"images/NOT1.png")},
+    {new Image(null,"images/AND0.png"),new Image(null,"images/AND1.png")},
+    {new Image(null,"images/XOR0.png"),new Image(null,"images/XOR1.png")},
+    {new Image(null,"images/SRC0.png"),new Image(null,"images/SRC1.png")}};
     private Board board;
     private Shell shell;
-    private Display display;
     private Menu bar;
-    private int xOffset=0,yOffset=0,blockSize=50,typeChoosed=0,xOrigin=0,yOrigin=0;
-    private Board.Block blockChoosed=null;
+    private int xOffset=0,yOffset=0,blockSize=50,choosedType=0,xOfsOrg=0,yOfsOrg=0;
+    private Board.Block choosedBlock=null;
     private String filePath="";
+    private OperationType operationType=OperationType.NONE;
+    private boolean MMoved=false;
     public LogicCircuits(Display display,Board board,int width,int height){
-        this.display=display;
         shell=new Shell(display);
         this.board=board;
         shell.setSize(width,height);
@@ -43,27 +44,59 @@ public class LogicCircuits implements Runnable{
                 switch(ke.keyCode){
                 case's':
                     if(!((ke.stateMask&SWT.SHIFT)!=0?saveAsFile():saveFile())) MsgBox.open(shell,SWT.OK|SWT.ERROR,"Error","Error occured during saving.");
-                    break;
+                    paint();break;
                 case'o':
                     if(openFile()) MsgBox.open(shell,SWT.OK|SWT.ERROR,"Error","Error occured during opening.");
-                    break;
-                case'q':board.clear();shell.dispose();break;
-                case'l':break;
-                default:
-                    if('1'<=ke.keyCode&&ke.keyCode<='6') typeChoosed=ke.keyCode-'1';
-                    break;
-                }
-            }
-            public void keyReleased(KeyEvent ke){
-        }});
-        shell.addMouseListener(new MouseListener(){
-            public void mouseDoubleClick(MouseEvent e){}
-            public void mouseDown(MouseEvent e){xOrigin=e.x;yOrigin=e.y;}
-            public void mouseUp(MouseEvent e){
-                if(e.x==xOrigin&&e.y==yOrigin) board.getBlock(e.x,e.y).clear();
-            }
-            
+                    paint();break;
+                case'q':board.clear();shell.dispose();paint();break;
+                case'l':operationType=OperationType.LINK;break;
+                default:if('1'<=ke.keyCode&&ke.keyCode<='6') choosedType=ke.keyCode-'1';break;
+            }}
+            public void keyReleased(KeyEvent ke){}
         });
+        shell.addMouseListener(new MouseListener(){
+            public void mouseDoubleClick(MouseEvent me){}
+            public void mouseDown(MouseEvent me){
+                switch(me.button){
+                case 1:
+                    xOfsOrg=xOffset+me.x;yOfsOrg=yOffset+me.y;
+                    operationType=OperationType.MOVE;
+                    break;
+                case 2:break;
+                case 3:operationType=OperationType.SET_TYPE;break;
+                default:break;
+            }}
+            public void mouseUp(MouseEvent me){
+                switch(operationType){
+                case LINK:{
+                    Board.Block block=MToBlock(me.x,me.y);
+                    if(choosedBlock==null) choosedBlock=block;
+                    else if(block!=null){choosedBlock.linkTo(block);operationType=OperationType.NONE;}
+                    }break;
+                case MOVE:if(!MMoved){
+                    Board.Block block=board.getBlock(me.x,me.y);
+                    if(block!=null) block.clear();
+                    }operationType=OperationType.NONE;break;
+                case SET_TYPE:if(!MMoved){
+                    Board.Block block=board.getBlock(me.x,me.y);
+                    if(block!=null) block.setType(choosedType);
+                    }operationType=OperationType.NONE;break;
+                case NONE:break;
+                default:operationType=OperationType.NONE;break;
+                }
+        }});
+        shell.addMouseMoveListener(new MouseMoveListener(){
+            public void mouseMove(MouseEvent me){
+                if(operationType==OperationType.MOVE){
+                    xOffset=xOfsOrg-me.x;yOffset=yOfsOrg-me.y;
+                    paint();
+        }}});
+    }
+    private Board.Block MToBlock(int x,int y){
+        x-=xOffset;y-=yOffset;
+        x/=blockSize;y/=blockSize;
+        if(x<0||board.getWidth()<x||y<0||board.getHeight()<y) return null;
+        return board.getBlock(x,y);
     }
     private boolean openFile(){
         filePath=(new DirectoryDialog(shell)).open();
@@ -93,27 +126,41 @@ public class LogicCircuits implements Runnable{
         filePath=(new DirectoryDialog(shell)).open();
         return saveFile();
     }
-    private void paint(Board.Block block){
-        GC gc=new GC(shell);
-        gc.drawImage(images[block.getType().ordinal()][block.getValue()?1:0],0,0,1000,1000,block.x*blockSize+xOffset,block.y*blockSize+yOffset,blockSize,blockSize);
-        gc.dispose();
+    private void paint(Board.Block block,GC gc){
+        int x=block.x*blockSize+xOffset,y=block.y*blockSize+yOffset;
+        gc.drawImage(images[block.getType().ordinal()][block.getValue()?1:0],0,0,1000,1000,x,y,blockSize,blockSize);
+        for(Board.Block target:block.getOutputBlocks()){
+            int tx=target.x*blockSize+xOffset,ty=target.y*blockSize+yOffset,mx=x+tx>>1,my=x+ty>>1;
+            gc.setForeground(shell.getDisplay().getSystemColor(SWT.COLOR_BLUE));
+            gc.drawLine(x,y,mx,my);
+            gc.setForeground(new Color(null,255,140,0));
+            gc.drawLine(mx,my,tx,ty);
+        }
     }
     private boolean paint(){
-        if(board.isEmpty()) return false;
+        GC gc=null;
+        if(board.isEmpty()){
+            gc=new GC(shell);
+            gc.setForeground(new Color(0,0,0));
+            gc.fillRectangle(shell.getBounds());
+            gc.dispose();
+            return false;
+        }
         int xl=-xOffset/blockSize,yl=-yOffset/blockSize,xr=xl+shell.getSize().x/blockSize,yr=yl+shell.getSize().y/blockSize;
         if(xl<0) xl=0;if(yl<0) yl=0;if(xr>=board.getWidth()) xr=board.getWidth();if(yr>=board.getHeight()) yr=board.getHeight();
+        gc=new GC(shell);
         for(int i=0;i<=yr-yl;i++)
-            for(int j=0;j<=xr-xl;j++) paint(board.getBlock(i,j));
+            for(int j=0;j<=xr-xl;j++) paint(board.getBlock(i,j),gc);
+        gc.dispose();
         return true;
     }
     public void run(){
         for(shell.open();!shell.isDisposed();)
-            if(!display.readAndDispatch()) display.sleep();
+            if(!shell.getDisplay().readAndDispatch()) shell.getDisplay().sleep();
     }
     public static void main(String[] args){
-        Display display=new Display();
-        LogicCircuits boardUI=new LogicCircuits(display,new Board(),1000,600);
+        LogicCircuits boardUI=new LogicCircuits(Display.getDefault(),new Board(),1000,600);
         boardUI.run();
-        display.dispose();
+        //display.dispose();
     }
 }
