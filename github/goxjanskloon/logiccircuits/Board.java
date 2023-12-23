@@ -22,9 +22,7 @@ public class Board{
                 case 4:return Xor;
                 case 5:return Src;
                 default:return null;
-                }
-            }
-        }
+        }}}
         public final int x,y;
         private AtomicInteger type;
         private AtomicBoolean value;
@@ -59,13 +57,13 @@ public class Board{
             if(output.contains(block)) return false;
             output.add(block);
             block.input.add(this);
-            flush();
+            block.flush();
             return true;
         }
         public boolean exchangeValue(){
             if(getType()!=Type.Src) throw new UnsupportedOperationException("Calling exchangeValue() on a not Src-Type Block");
             boolean result=!value.getAndSet(!getValue());
-            flush();
+            for(Block block:output) block.flush();
             return result;
         }
         public boolean isEmpty(){
@@ -94,12 +92,11 @@ public class Board{
     public int getHeight(){return isEmpty()?0:blocks.getFirst().size();}
     public boolean clear(){
         if(isEmpty()) return false;
-        threadPool.shutdownNow();
-        blocks.clear();
+        silence();blocks.clear();
         return true;
     }
     public void silence(){threadPool.shutdownNow();}
-    public boolean loadFrom(Reader reader){
+    public boolean loadFrom(Readable reader){
         clear();try{
         Scanner scanner=new Scanner(reader);
         int width=scanner.nextInt(),height=scanner.nextInt();
