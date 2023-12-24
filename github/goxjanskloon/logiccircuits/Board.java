@@ -2,13 +2,16 @@ package github.goxjanskloon.logiccircuits;
 import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Scanner;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 public class Board{
+    public interface ModifyListener{void modifyBlock(Block block);}
     public class Block{
         public enum Type{
             VOID(),OR(),NOT(),AND(),XOR(),SRC();
@@ -31,8 +34,8 @@ public class Board{
             this.type=new AtomicInteger(type);
             this.value=new AtomicBoolean(value);
         }
-        public Block[] getInputBlocks(){return (Block[])input.toArray();}
-        public Block[] getOutputBlocks(){return (Block[])output.toArray();}
+        public ArrayList<Block> getInputBlocks(){return new ArrayList<Block>(input);}
+        public ArrayList<Block> getOutputBlocks(){return new ArrayList<Block>(output);}
         public Type getType(){return Type.valueOf(type.get());}
         public boolean setType(int type){
             if(this.type.get()==type) return false;
@@ -51,9 +54,10 @@ public class Board{
             case SRC:newValue=value.get();break;
             default:newValue=false;
             }
-            if(value.compareAndSet(!newValue,newValue))
+            if(value.compareAndSet(!newValue,newValue)){
                 for(Block b:output) b.flush();
-        }});}
+                for(ModifyListener ml:modifyListeners){ml.modifyBlock(Block.this);}
+        }}});}
         public boolean linkTo(Block block){
             if(output.contains(block)) return false;
             output.add(block);
@@ -78,7 +82,8 @@ public class Board{
             return true;
         }
     }
-    ArrayList<ArrayList<Block>> blocks=new ArrayList<ArrayList<Block>>();
+    private ArrayList<ArrayList<Block>> blocks=new ArrayList<ArrayList<Block>>();
+    private CopyOnWriteArrayList<ModifyListener> modifyListeners=new CopyOnWriteArrayList<ModifyListener>();
     private ExecutorService threadPool=Executors.newCachedThreadPool(new ThreadFactory(){
         public Thread newThread(Runnable r){
             Thread thread=new Thread(r);
@@ -87,6 +92,7 @@ public class Board{
         }});
     public Board(){}
     public Board(int width,int height){setSize(width, height);}
+    public void addModifyListener(ModifyListener modifyListener){modifyListeners.add(modifyListener);}
     public Block getBlock(int x,int y){return blocks.get(x).get(y);}
     public boolean isEmpty(){return blocks.isEmpty();}
     public int getWidth(){return blocks.size();}

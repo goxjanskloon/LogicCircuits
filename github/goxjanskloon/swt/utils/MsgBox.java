@@ -5,7 +5,7 @@ public class MsgBox{
     public static int open(Shell parent,int style,String text,String msg){
         MessageBox mb=new MessageBox(parent,style);
         if(!text.isEmpty()) mb.setText(text);
-        if(!msg.isEmpty()) mb.setText(msg);
+        if(!msg.isEmpty()) mb.setMessage(msg);
         return mb.open();
     }
 }
