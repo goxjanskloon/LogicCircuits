@@ -39,7 +39,9 @@ public class Board{
         public Type getType(){return Type.valueOf(type.get());}
         public boolean setType(int type){
             if(this.type.get()==type) return false;
-            this.type.set(type);flush();return true;
+            this.type.set(type);flush();
+            callModifyListener(this);
+            return true;
         }
         public boolean getValue(){return value.get();}
         public void flush(){
@@ -56,13 +58,14 @@ public class Board{
             }
             if(value.compareAndSet(!newValue,newValue)){
                 for(Block b:output) b.flush();
-                for(ModifyListener ml:modifyListeners){ml.modifyBlock(Block.this);}
+                callModifyListener(Block.this);
         }}});}
         public boolean linkTo(Block block){
             if(output.contains(block)) return false;
             output.add(block);
             block.input.add(this);
             block.flush();
+            callModifyListener(this);
             return true;
         }
         public boolean exchangeValue(){
@@ -79,6 +82,7 @@ public class Board{
             for(Block block:input) block.output.remove(this);
             for(Block block:output){block.input.remove(this);block.flush();}
             input.clear();output.clear();type.set(Type.VOID.ordinal());
+            callModifyListener(this);
             return true;
         }
     }
@@ -91,8 +95,9 @@ public class Board{
             return thread;
         }});
     public Board(){}
-    public Board(int width,int height){setSize(width, height);}
+    public Board(int width,int height){resetToSize(width, height);}
     public void addModifyListener(ModifyListener modifyListener){modifyListeners.add(modifyListener);}
+    private void callModifyListener(Block block){for(ModifyListener ml:modifyListeners) ml.modifyBlock(block);}
     public Block getBlock(int x,int y){return blocks.get(x).get(y);}
     public boolean isEmpty(){return blocks.isEmpty();}
     public int getWidth(){return blocks.size();}
@@ -144,12 +149,11 @@ public class Board{
         }catch(Exception e){e.printStackTrace();return false;}
         return true;
     }
-    public void setSize(int width,int height){
+    public void resetToSize(int width,int height){
         clear();
         for(int i=0;i<height;i++){
             blocks.add(new ArrayList<Block>());
             for(int j=0;j<width;j++) blocks.getLast().add(new Block(Block.Type.VOID.ordinal(),false,i,j));
         }
     }
-    protected void finalize(){clear();}
 }

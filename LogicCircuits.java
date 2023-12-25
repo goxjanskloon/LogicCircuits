@@ -1,5 +1,7 @@
 import java.io.FileReader;
 import java.io.FileWriter;
+import java.util.Scanner;
+
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.KeyEvent;
 import org.eclipse.swt.events.KeyListener;
@@ -49,6 +51,12 @@ public class LogicCircuits implements Runnable{
             public void keyPressed(KeyEvent ke){
                 if((ke.stateMask&SWT.CTRL)==0) return;
                 switch(ke.keyCode){
+                case'n':{
+                    Scanner s=new Scanner(System.in);
+                    board.resetToSize(s.nextInt(),s.nextInt());
+                    s.close();
+                    paint();
+                }break;
                 case's':
                     if(!((ke.stateMask&SWT.SHIFT)!=0?saveAsFile():saveFile())) MsgBox.open(shell,SWT.OK|SWT.ERROR,"Error","Error occured during saving.");
                     paint();break;
@@ -66,7 +74,7 @@ public class LogicCircuits implements Runnable{
             public void mouseDown(MouseEvent me){if(!board.isEmpty()){
                 switch(me.button){
                 case 1:
-                    xOfsOrg=xOffset+me.x;yOfsOrg=yOffset+me.y;
+                    xOfsOrg=xOffset-me.x;yOfsOrg=yOffset-me.y;
                     operationType=OperationType.MOVE;
                     break;
                 case 2:break;
@@ -95,7 +103,7 @@ public class LogicCircuits implements Runnable{
         shell.addMouseMoveListener(new MouseMoveListener(){
             public void mouseMove(MouseEvent me){
                 if(operationType==OperationType.MOVE){
-                    xOffset=me.x-xOfsOrg;yOffset=me.y-yOfsOrg;
+                    xOffset=me.x+xOfsOrg;yOffset=me.y+yOfsOrg;
                     paint();
         }}});
     }
