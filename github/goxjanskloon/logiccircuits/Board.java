@@ -1,11 +1,12 @@
 package github.goxjanskloon.logiccircuits;
 import java.io.Writer;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Scanner;
-import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -28,61 +29,94 @@ public class Board{
         public final int x,y;
         private AtomicInteger type;
         private AtomicBoolean value;
-        private CopyOnWriteArrayList<Block> input=new CopyOnWriteArrayList<Block>(),output=new CopyOnWriteArrayList<Block>();
-        private Block(int type,boolean value,int x,int y){
+        private Block[] input=new Block[2];
+        private ConcurrentSkipListSet<Block> output=new ConcurrentSkipListSet<Block>();
+        private Block(Type type,boolean value,int x,int y){
             this.x=x;this.y=y;
-            this.type=new AtomicInteger(type);
+            this.type=new AtomicInteger(type.ordinal());
             this.value=new AtomicBoolean(value);
         }
-        public ArrayList<Block> getInputBlocks(){return new ArrayList<Block>(input);}
-        public ArrayList<Block> getOutputBlocks(){return new ArrayList<Block>(output);}
         public Type getType(){return Type.valueOf(type.get());}
-        public boolean setType(int type){
-            if(this.type.get()==type) return false;
-            this.type.set(type);flush();
-            callModifyListener(this);
+        public boolean setType(Type type){
+            if(getType()==type) return false;
+            this.type.set(type.ordinal());
+            flush();callModifyListeners(this);
             return true;
         }
         public boolean getValue(){return value.get();}
-        public void flush(){
-            threadPool.execute(new Runnable(){public void run(){
-            boolean newValue;
-            switch(Block.Type.valueOf(type.get())){
-            case VOID:newValue=!input.isEmpty()&&input.getFirst().value.get();break;
-            case OR:newValue=input.size()>=2&&(input.getFirst().value.get()||input.get(1).value.get());break;
-            case NOT:newValue=!input.isEmpty()&&!input.getFirst().value.get();break;
-            case AND:newValue=input.size()>=2&&input.getFirst().value.get()&&input.get(1).value.get();break;
-            case XOR:newValue=input.size()>=2&&input.getFirst().value.get()^input.get(1).value.get();break;
-            case SRC:newValue=value.get();break;
-            default:newValue=false;
-            }
-            if(value.compareAndSet(!newValue,newValue)){
-                for(Block b:output) b.flush();
-                callModifyListener(Block.this);
-        }}});}
-        public boolean linkTo(Block block){
-            if(output.contains(block)) return false;
-            output.add(block);
-            block.input.add(this);
-            block.flush();
-            callModifyListener(this);
-            return true;
-        }
-        public boolean exchangeValue(){
+        public boolean inverseValue(){
             if(getType()!=Type.SRC) throw new UnsupportedOperationException("Calling exchangeValue() on a not SRC-Type Block");
             boolean result=!value.getAndSet(!getValue());
             for(Block block:output) block.flush();
             return result;
         }
-        public boolean isEmpty(){
-            return getType()==Type.VOID&&input.isEmpty()&&output.isEmpty();
+        public int getInputSize(){return (input[0]==null?0:1)+(input[1]==null?0:1);}
+        public int getOutputSize(){return output.size();}
+        public Block[] getInputs(){
+            Block[] result=new Block[getInputSize()];
+            switch(result.length){
+            case 2:result[0]=input[0];result[1]=input[1];break;
+            case 1:result[0]=(input[0]!=null?input[0]:input[1]);break;
+            case 0:break;
+            default:break;
+            }return result;
         }
+        public Block[] getOutputs(){return (Block[]) output.toArray();}
+        private boolean addInput(Block block){
+            switch(getType()){
+            case VOID:
+            case NOT:if(getInputSize()==1) return false;else break;
+            case OR:
+            case AND:
+            case XOR:if(getInputSize()==2) return false;else break;
+            case SRC:
+            default:return false;
+            }
+            input[getInputSize()]=block;return true;
+        }
+        public boolean addOutput(Block block){
+            if(output.contains(block)||block.addInput(this)) return false;
+            output.add(block);
+            block.flush();callModifyListeners(this);
+            return true;
+        }
+        public boolean removeInput(Block block){
+            return true;
+        }
+        public boolean removeOutput(Block block){
+            return true;
+        }
+        public boolean clearInput(){
+            return true;
+        }
+        public boolean clearOutput(){
+            return true;
+        }
+        public void flush(){
+            threadPool.execute(new Runnable(){public void run(){
+            boolean newValue=false;
+            switch(getType()){
+            case SRC:newValue=getValue();
+                if(input[0]==null) break;
+            case VOID:newValue=input[0].getValue();break;
+            case NOT:newValue=!input[0].getValue();
+                if(input[1]==null) break;
+            case OR:newValue=input[0].getValue()||input[1].getValue();break;
+            case AND:newValue=input[0].getValue()&&input[1].getValue();break;
+            case XOR:newValue=input[0].getValue()^input[1].getValue();break;
+            default:break;
+            }
+            if(value.compareAndSet(!newValue,newValue)){
+                for(Block b:output) b.flush();
+                callModifyListeners(Block.this);
+        }}});}
+        public boolean isEmpty(){return getType()==Type.VOID&&getInputSize()==0&&output.isEmpty();}
         public boolean clear(){
             if(isEmpty()) return false;
-            for(Block block:input) block.output.remove(this);
-            for(Block block:output){block.input.remove(this);block.flush();}
-            input.clear();output.clear();type.set(Type.VOID.ordinal());
-            callModifyListener(this);
+            for(Block block:input) block.removeOutput(this);
+            for(Block block:output){block.removeInput(this);block.flush();}
+            input[0]=input[1]=null;clearOutput();setType(Type.VOID);
+            callModifyListeners(this);
             return true;
         }
     }
@@ -97,7 +131,7 @@ public class Board{
     public Board(){}
     public Board(int width,int height){resetToSize(width, height);}
     public void addModifyListener(ModifyListener modifyListener){modifyListeners.add(modifyListener);}
-    private void callModifyListener(Block block){for(ModifyListener ml:modifyListeners) ml.modifyBlock(block);}
+    private void callModifyListeners(Block block){for(ModifyListener ml:modifyListeners) ml.modifyBlock(block);}
     public Block getBlock(int x,int y){return blocks.get(x).get(y);}
     public boolean isEmpty(){return blocks.isEmpty();}
     public int getWidth(){return blocks.size();}
