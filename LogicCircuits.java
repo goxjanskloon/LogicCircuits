@@ -111,7 +111,7 @@ public class LogicCircuits implements Runnable{
         x-=xOffset;y-=yOffset;
         x/=blockSize;y/=blockSize;
         if(x<0||board.getWidth()<=x||y<0||board.getHeight()<=y) return null;
-        return board.getBlock(x,y);
+        return board.get(x,y);
     }
     private boolean openFile(){
         filePath=(new FileDialog(shell)).open();
@@ -162,7 +162,7 @@ public class LogicCircuits implements Runnable{
         int xl=-xOffset/blockSize,yl=-yOffset/blockSize,xr=xl+shell.getSize().x/blockSize,yr=yl+shell.getSize().y/blockSize;
         if(xl<0) xl=0;if(yl<0) yl=0;if(xr>=board.getWidth()) xr=board.getWidth()-1;if(yr>=board.getHeight()) yr=board.getHeight()-1;
         for(int i=yl;i<=yr;i++)
-            for(int j=xl;j<=xr;j++) paint(board.getBlock(i,j),gc);
+            for(int j=xl;j<=xr;j++) paint(board.get(i,j),gc);
         gc.dispose();
         return true;
     }

@@ -1,11 +1,8 @@
 package github.goxjanskloon.logiccircuits;
 import java.io.Writer;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Scanner;
 import java.util.concurrent.ConcurrentSkipListSet;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
@@ -46,7 +43,7 @@ public class Board{
         public boolean getValue(){return value.get();}
         public boolean inverseValue(){
             if(getType()!=Type.SRC) throw new UnsupportedOperationException("Calling exchangeValue() on a not SRC-Type Block");
-            boolean result=!value.getAndSet(!getValue());
+            boolean result=!getValue();value.getAndSet(result);
             for(Block block:output) block.flush();
             return result;
         }
@@ -80,30 +77,32 @@ public class Board{
             block.flush();callModifyListeners(this);
             return true;
         }
-        public boolean removeInput(Block block){
-            return true;
+        private boolean removeInput(Block block){
+            if(input[1]!=null){input[1]=null;return true;}
+            else if(input[0]!=null){input[0]=null;return true;}
+            else return false;
         }
-        public boolean removeOutput(Block block){
-            return true;
-        }
-        public boolean clearInput(){
+        public boolean removeOutput(Block block){return output.remove(block);}
+        private boolean clearInput(){
+            if(getInputSize()==0) return false;
+            input[0]=input[1]=null;
             return true;
         }
         public boolean clearOutput(){
-            return true;
+            if(output.isEmpty()) return false;
+            output.clear();return true;
         }
         public void flush(){
             threadPool.execute(new Runnable(){public void run(){
             boolean newValue=false;
+            int len=getInputSize();
             switch(getType()){
-            case SRC:newValue=getValue();
-                if(input[0]==null) break;
-            case VOID:newValue=input[0].getValue();break;
-            case NOT:newValue=!input[0].getValue();
-                if(input[1]==null) break;
-            case OR:newValue=input[0].getValue()||input[1].getValue();break;
-            case AND:newValue=input[0].getValue()&&input[1].getValue();break;
-            case XOR:newValue=input[0].getValue()^input[1].getValue();break;
+            case SRC:newValue=getValue();break;
+            case VOID:newValue=len==1&&input[0].getValue();break;
+            case NOT:newValue=len==1&&!input[0].getValue();
+            case OR:newValue=len==2&&input[0]!=null&&input[0].getValue()||input[1].getValue();break;
+            case AND:newValue=len==2&&input[0].getValue()&&input[1].getValue();break;
+            case XOR:newValue=len==2&&input[0].getValue()^input[1].getValue();break;
             default:break;
             }
             if(value.compareAndSet(!newValue,newValue)){
@@ -115,13 +114,13 @@ public class Board{
             if(isEmpty()) return false;
             for(Block block:input) block.removeOutput(this);
             for(Block block:output){block.removeInput(this);block.flush();}
-            input[0]=input[1]=null;clearOutput();setType(Type.VOID);
+            clearInput();clearOutput();setType(Type.VOID);
             callModifyListeners(this);
             return true;
         }
     }
     private ArrayList<ArrayList<Block>> blocks=new ArrayList<ArrayList<Block>>();
-    private CopyOnWriteArrayList<ModifyListener> modifyListeners=new CopyOnWriteArrayList<ModifyListener>();
+    private ConcurrentSkipListSet<ModifyListener> modifyListeners=new ConcurrentSkipListSet<ModifyListener>();
     private ExecutorService threadPool=Executors.newCachedThreadPool(new ThreadFactory(){
         public Thread newThread(Runnable r){
             Thread thread=new Thread(r);
@@ -130,12 +129,17 @@ public class Board{
         }});
     public Board(){}
     public Board(int width,int height){resetToSize(width, height);}
-    public void addModifyListener(ModifyListener modifyListener){modifyListeners.add(modifyListener);}
+    public boolean addModifyListener(ModifyListener modifyListener){return modifyListeners.add(modifyListener);}
+    public boolean removeModifyListener(ModifyListener modifyListener){return modifyListeners.remove(modifyListener);}
+    public boolean clearModifyListeners(){
+        if(modifyListeners.isEmpty()) return false;
+        modifyListeners.clear();return true;
+    }
     private void callModifyListeners(Block block){for(ModifyListener ml:modifyListeners) ml.modifyBlock(block);}
-    public Block getBlock(int x,int y){return blocks.get(x).get(y);}
+    public Block get(int x,int y){return blocks.get(x).get(y);}
     public boolean isEmpty(){return blocks.isEmpty();}
-    public int getWidth(){return blocks.size();}
-    public int getHeight(){return isEmpty()?0:blocks.getFirst().size();}
+    public int getWidth(){return isEmpty()?0:blocks.getFirst().size();}
+    public int getHeight(){return blocks.size();}
     public boolean clear(){
         if(isEmpty()) return false;
         silence();blocks.clear();
@@ -149,14 +153,14 @@ public class Board{
         for(int i=0;i<height;i++){
             blocks.add(new ArrayList<Block>());
             for(int j=0;j<width;j++){
-                blocks.getLast().add(new Block(scanner.nextInt(),scanner.nextInt()==1,i,j));
+                blocks.getLast().add(new Block(Block.Type.valueOf(scanner.nextInt()),scanner.nextInt()==1,i,j));
             }
         }
         for(int i=0;i<height;i++)
             for(int j=0;j<width;j++){
-                Block block=getBlock(i,j);
-                for(int inputSize=scanner.nextInt();inputSize-->0;) block.input.add(blocks.get(scanner.nextInt()).get(scanner.nextInt()));
-                for(int outputSize=scanner.nextInt();outputSize-->0;) block.output.add(blocks.get(scanner.nextInt()).get(scanner.nextInt()));
+                Block block=get(i,j);
+                for(int inputSize=scanner.nextInt();inputSize-->0;) block.addInput(get(scanner.nextInt(),scanner.nextInt()));
+                for(int outputSize=scanner.nextInt();outputSize-->0;) block.addOutput(get(scanner.nextInt(),scanner.nextInt()));
             }
         scanner.close();
         }catch(Exception e){
@@ -170,15 +174,15 @@ public class Board{
         writer.write(blocks.size()+" "+blocks.getFirst().size()+" ");
         for(int i=0;i<blocks.size();i++)
             for(int j=0;j<blocks.get(i).size();j++){
-                Block block=getBlock(i,j);
+                Block block=get(i,j);
                 writer.write(block.type.get()+" "+(block.value.get()?1:0)+" ");
             }
         for(int i=0;i<blocks.size();i++)
             for(int j=0;j<blocks.get(i).size();j++){
-                Block block=getBlock(i,j);
-                writer.write(block.input.size()+" "+block.output.size()+" ");
-                for(Block b:block.input) writer.write(b.x+" "+b.y+" ");
-                for(Block b:block.output) writer.write(b.x+" "+b.y+" ");
+                Block block=get(i,j);
+                writer.write(block.getInputSize()+" "+block.getOutputSize()+" ");
+                for(Block b:block.getInputs()) writer.write(b.x+" "+b.y+" ");
+                for(Block b:block.getOutputs()) writer.write(b.x+" "+b.y+" ");
             }
         }catch(Exception e){e.printStackTrace();return false;}
         return true;
@@ -187,7 +191,7 @@ public class Board{
         clear();
         for(int i=0;i<height;i++){
             blocks.add(new ArrayList<Block>());
-            for(int j=0;j<width;j++) blocks.getLast().add(new Block(Block.Type.VOID.ordinal(),false,i,j));
+            for(int j=0;j<width;j++) blocks.getLast().add(new Block(Block.Type.VOID,false,i,j));
         }
     }
 }
