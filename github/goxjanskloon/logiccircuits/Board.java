@@ -1,7 +1,10 @@
 package github.goxjanskloon.logiccircuits;
 import java.io.Writer;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
 import java.util.Scanner;
+import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
@@ -10,7 +13,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 public class Board{
     public interface ModifyListener{void modifyBlock(Block block);}
-    public class Block{
+    public class Block implements Comparable<Block>{
         public enum Type{
             VOID(),OR(),NOT(),AND(),XOR(),SRC();
             public static Type valueOf(int value){
@@ -26,8 +29,7 @@ public class Board{
         public final int x,y;
         private AtomicInteger type;
         private AtomicBoolean value;
-        private Block[] input=new Block[2];
-        private ConcurrentSkipListSet<Block> output=new ConcurrentSkipListSet<Block>();
+        private Set<Block> input=new ConcurrentSkipListSet<Block>(),output=new ConcurrentSkipListSet<Block>();
         private Block(Type type,boolean value,int x,int y){
             this.x=x;this.y=y;
             this.type=new AtomicInteger(type.ordinal());
@@ -42,23 +44,15 @@ public class Board{
         }
         public boolean getValue(){return value.get();}
         public boolean inverseValue(){
-            if(getType()!=Type.SRC) throw new UnsupportedOperationException("Calling exchangeValue() on a not SRC-Type Block");
-            boolean result=!getValue();value.getAndSet(result);
+            if(getType()!=Type.SRC) throw new UnsupportedOperationException("Calling inverseValue() on a not SRC-Type Block");
+            boolean result=!value.getAndSet(!getValue());
             for(Block block:output) block.flush();
             return result;
         }
-        public int getInputSize(){return (input[0]==null?0:1)+(input[1]==null?0:1);}
+        public int getInputSize(){return input.size();}
         public int getOutputSize(){return output.size();}
-        public Block[] getInputs(){
-            Block[] result=new Block[getInputSize()];
-            switch(result.length){
-            case 2:result[0]=input[0];result[1]=input[1];break;
-            case 1:result[0]=(input[0]!=null?input[0]:input[1]);break;
-            case 0:break;
-            default:break;
-            }return result;
-        }
-        public Block[] getOutputs(){return (Block[]) output.toArray();}
+        public Set<Block> getInputs(){return Collections.unmodifiableSet(input);}
+        public Set<Block> getOutputs(){return Collections.unmodifiableSet(output);}
         private boolean addInput(Block block){
             switch(getType()){
             case VOID:
@@ -69,40 +63,37 @@ public class Board{
             case SRC:
             default:return false;
             }
-            input[getInputSize()]=block;return true;
+            input.add(block);return true;
         }
         public boolean addOutput(Block block){
-            if(output.contains(block)||block.addInput(this)) return false;
-            output.add(block);
-            block.flush();callModifyListeners(this);
-            return true;
+            if(output.add(block)){
+                if(block.addInput(this)){callModifyListeners(this);return true;}
+                output.remove(block);return false;
+            }return false;
         }
-        private boolean removeInput(Block block){
-            if(input[1]!=null){input[1]=null;return true;}
-            else if(input[0]!=null){input[0]=null;return true;}
-            else return false;
-        }
+        private boolean removeInput(Block block){return input.remove(block);}
         public boolean removeOutput(Block block){return output.remove(block);}
         private boolean clearInput(){
-            if(getInputSize()==0) return false;
-            input[0]=input[1]=null;
+            if(input.isEmpty()) return false;
+            input.clear();flush();callModifyListeners(this);
             return true;
         }
         public boolean clearOutput(){
             if(output.isEmpty()) return false;
+            for(Block block:output) block.removeInput(this);
             output.clear();return true;
         }
         public void flush(){
             threadPool.execute(new Runnable(){public void run(){
             boolean newValue=false;
-            int len=getInputSize();
+            Iterator<Block> it=input.iterator();
             switch(getType()){
             case SRC:newValue=getValue();break;
-            case VOID:newValue=len==1&&input[0].getValue();break;
-            case NOT:newValue=len==1&&!input[0].getValue();
-            case OR:newValue=len==2&&input[0]!=null&&input[0].getValue()||input[1].getValue();break;
-            case AND:newValue=len==2&&input[0].getValue()&&input[1].getValue();break;
-            case XOR:newValue=len==2&&input[0].getValue()^input[1].getValue();break;
+            case VOID:newValue=getInputSize()==1&&it.next().getValue();break;
+            case NOT:newValue=getInputSize()==1&&!it.next().getValue();
+            case OR:newValue=getInputSize()==2&&it.next().getValue()||it.next().getValue();break;
+            case AND:newValue=getInputSize()==2&&it.next().getValue()&&it.next().getValue();break;
+            case XOR:newValue=getInputSize()==2&&it.next().getValue()^it.next().getValue();break;
             default:break;
             }
             if(value.compareAndSet(!newValue,newValue)){
@@ -112,21 +103,16 @@ public class Board{
         public boolean isEmpty(){return getType()==Type.VOID&&getInputSize()==0&&output.isEmpty();}
         public boolean clear(){
             if(isEmpty()) return false;
-            for(Block block:input) block.removeOutput(this);
-            for(Block block:output){block.removeInput(this);block.flush();}
             clearInput();clearOutput();setType(Type.VOID);
             callModifyListeners(this);
             return true;
         }
+        public int compareTo(Block block){return Integer.valueOf(y*getHeight()+x).compareTo(block.y*getHeight()+block.x);}
     }
     private ArrayList<ArrayList<Block>> blocks=new ArrayList<ArrayList<Block>>();
     private ConcurrentSkipListSet<ModifyListener> modifyListeners=new ConcurrentSkipListSet<ModifyListener>();
     private ExecutorService threadPool=Executors.newCachedThreadPool(new ThreadFactory(){
-        public Thread newThread(Runnable r){
-            Thread thread=new Thread(r);
-            thread.setDaemon(true);
-            return thread;
-        }});
+        public Thread newThread(Runnable r){Thread thread=new Thread(r);thread.setDaemon(true);return thread;}});
     public Board(){}
     public Board(int width,int height){resetToSize(width, height);}
     public boolean addModifyListener(ModifyListener modifyListener){return modifyListeners.add(modifyListener);}
@@ -193,5 +179,7 @@ public class Board{
             blocks.add(new ArrayList<Block>());
             for(int j=0;j<width;j++) blocks.getLast().add(new Block(Block.Type.VOID,false,i,j));
         }
+        for(ArrayList<Block> i:blocks)
+            for(Block j:i) callModifyListeners(j);
     }
 }
