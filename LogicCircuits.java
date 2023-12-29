@@ -1,7 +1,7 @@
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.util.Scanner;
-
+import java.util.concurrent.atomic.AtomicInteger;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.KeyEvent;
 import org.eclipse.swt.events.KeyListener;
@@ -20,6 +20,18 @@ import github.goxjanskloon.logiccircuits.Board.Block;
 import github.goxjanskloon.logiccircuits.Board.ModifyListener;
 import github.goxjanskloon.swt.utils.MsgBox;
 public class LogicCircuits implements Runnable{
+    private class BoardModifyListener implements ModifyListener<BoardModifyListener>{
+        private static AtomicInteger count=new AtomicInteger(0);
+        public final int id=count.getAndIncrement();
+        public int compareTo(BoardModifyListener ml){return Integer.valueOf(id).compareTo(ml.id);}
+        public void modifyBlock(Block block){
+            int xl=-xOffset/blockSize,yl=-yOffset/blockSize,xr=xl+shell.getSize().x/blockSize,yr=yl+shell.getSize().y/blockSize;
+            if(xl<0) xl=0;if(yl<0) yl=0;if(xr>=board.getWidth()) xr=board.getWidth()-1;if(yr>=board.getHeight()) yr=board.getHeight()-1;
+            if(block.x<xl||xr<block.x||block.y<yl||yr<block.y) return;
+            GC gc=new GC(shell);
+            paint(block,gc);gc.dispose();
+        }
+    }
     private enum OperationType{LINK,MOVE,SET_TYPE,NONE};
     private static final Image[][] images={
     {new Image(null,"images/VOID0.png"),new Image(null,"images/VOID1.png")},
@@ -42,11 +54,7 @@ public class LogicCircuits implements Runnable{
         shell.setSize(width,height);
         bar=new Menu(shell,SWT.BAR);
         shell.setMenuBar(bar);
-        board.addModifyListener(new ModifyListener(){
-            public void modifyBlock(Block block){
-                GC gc=new GC(shell);
-                paint(block,gc);gc.dispose();
-            }});
+        board.addModifyListener(new BoardModifyListener());
         shell.addKeyListener(new KeyListener(){
             public void keyPressed(KeyEvent ke){
                 if((ke.stateMask&SWT.CTRL)==0) return;
@@ -86,16 +94,18 @@ public class LogicCircuits implements Runnable{
                 case LINK:{
                     Board.Block block=MToBlock(me.x,me.y);
                     if(choosedBlock==null) choosedBlock=block;
-                    else if(block!=null){choosedBlock.linkTo(block);operationType=OperationType.NONE;}
+                    else if(block!=null){choosedBlock.addOutput(block);operationType=OperationType.NONE;choosedBlock=null;}
                     }break;
                 case MOVE:if(!MMoved){
                     Board.Block block=MToBlock(me.x,me.y);
                     if(block!=null) block.clear();
-                    }operationType=OperationType.NONE;break;
+                    }operationType=OperationType.NONE;MMoved=false;break;
                 case SET_TYPE:if(!MMoved){
                     Board.Block block=MToBlock(me.x,me.y);
-                    if(block!=null) block.setType(choosedType);
-                    }operationType=OperationType.NONE;break;
+                    if(block!=null)
+                        if(block.getType()!=Block.Type.SRC) block.setType(Block.Type.valueOf(choosedType));
+                        else block.inverseValue();
+                    }operationType=OperationType.NONE;MMoved=false;break;
                 case NONE:break;
                 default:operationType=OperationType.NONE;break;
                 }
@@ -104,7 +114,7 @@ public class LogicCircuits implements Runnable{
             public void mouseMove(MouseEvent me){
                 if(operationType==OperationType.MOVE){
                     xOffset=me.x+xOfsOrg;yOffset=me.y+yOfsOrg;
-                    paint();
+                    paint();MMoved=true;
         }}});
     }
     private Board.Block MToBlock(int x,int y){
@@ -146,7 +156,7 @@ public class LogicCircuits implements Runnable{
     private void paint(Board.Block block,GC gc){
         int x=block.x*blockSize+xOffset,y=block.y*blockSize+yOffset;
         gc.drawImage(images[block.getType().ordinal()][block.getValue()?1:0],0,0,16,16,x,y,blockSize,blockSize);
-        for(Board.Block target:block.getOutputBlocks()){
+        for(Board.Block target:block.getOutputs()){
             int tx=target.x*blockSize+xOffset,ty=target.y*blockSize+yOffset,mx=x+tx>>1,my=x+ty>>1;
             gc.setForeground(new Color(255,255,255,125));
             gc.drawLine(x,y,mx,my);
@@ -162,7 +172,7 @@ public class LogicCircuits implements Runnable{
         int xl=-xOffset/blockSize,yl=-yOffset/blockSize,xr=xl+shell.getSize().x/blockSize,yr=yl+shell.getSize().y/blockSize;
         if(xl<0) xl=0;if(yl<0) yl=0;if(xr>=board.getWidth()) xr=board.getWidth()-1;if(yr>=board.getHeight()) yr=board.getHeight()-1;
         for(int i=yl;i<=yr;i++)
-            for(int j=xl;j<=xr;j++) paint(board.get(i,j),gc);
+            for(int j=xl;j<=xr;j++) paint(board.get(j,i),gc);
         gc.dispose();
         return true;
     }

@@ -12,7 +12,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 public class Board{
-    public interface ModifyListener{void modifyBlock(Block block);}
+    public interface ModifyListener<T extends ModifyListener<T>> extends Comparable<T>{void modifyBlock(Block block);}
     public class Block implements Comparable<Block>{
         public enum Type{
             VOID(),OR(),NOT(),AND(),XOR(),SRC();
@@ -47,6 +47,7 @@ public class Board{
             if(getType()!=Type.SRC) throw new UnsupportedOperationException("Calling inverseValue() on a not SRC-Type Block");
             boolean result=!value.getAndSet(!getValue());
             for(Block block:output) block.flush();
+            callModifyListeners(this);
             return result;
         }
         public int getInputSize(){return input.size();}
@@ -55,15 +56,10 @@ public class Board{
         public Set<Block> getOutputs(){return Collections.unmodifiableSet(output);}
         private boolean addInput(Block block){
             switch(getType()){
-            case VOID:
-            case NOT:if(getInputSize()==1) return false;else break;
-            case OR:
-            case AND:
-            case XOR:if(getInputSize()==2) return false;else break;
-            case SRC:
-            default:return false;
-            }
-            input.add(block);return true;
+            case VOID:case NOT:if(getInputSize()==1) return false;else break;
+            case OR:case AND:case XOR:if(getInputSize()==2) return false;else break;
+            case SRC:default:return false;
+            }input.add(block);return true;
         }
         public boolean addOutput(Block block){
             if(output.add(block)){
@@ -110,22 +106,22 @@ public class Board{
         public int compareTo(Block block){return Integer.valueOf(y*getHeight()+x).compareTo(block.y*getHeight()+block.x);}
     }
     private ArrayList<ArrayList<Block>> blocks=new ArrayList<ArrayList<Block>>();
-    private ConcurrentSkipListSet<ModifyListener> modifyListeners=new ConcurrentSkipListSet<ModifyListener>();
+    private ConcurrentSkipListSet<ModifyListener<?>> modifyListeners=new ConcurrentSkipListSet<ModifyListener<?>>();
     private ExecutorService threadPool=Executors.newCachedThreadPool(new ThreadFactory(){
         public Thread newThread(Runnable r){Thread thread=new Thread(r);thread.setDaemon(true);return thread;}});
     public Board(){}
     public Board(int width,int height){resetToSize(width, height);}
-    public boolean addModifyListener(ModifyListener modifyListener){return modifyListeners.add(modifyListener);}
-    public boolean removeModifyListener(ModifyListener modifyListener){return modifyListeners.remove(modifyListener);}
+    public boolean addModifyListener(ModifyListener<?> modifyListener){return modifyListeners.add(modifyListener);}
+    public boolean removeModifyListener(ModifyListener<?> modifyListener){return modifyListeners.remove(modifyListener);}
     public boolean clearModifyListeners(){
         if(modifyListeners.isEmpty()) return false;
         modifyListeners.clear();return true;
     }
-    private void callModifyListeners(Block block){for(ModifyListener ml:modifyListeners) ml.modifyBlock(block);}
+    private void callModifyListeners(Block block){for(ModifyListener<?> ml:modifyListeners) ml.modifyBlock(block);}
     public Block get(int x,int y){return blocks.get(x).get(y);}
     public boolean isEmpty(){return blocks.isEmpty();}
-    public int getWidth(){return isEmpty()?0:blocks.getFirst().size();}
-    public int getHeight(){return blocks.size();}
+    public int getWidth(){return blocks.size();}
+    public int getHeight(){return isEmpty()?0:blocks.getFirst().size();}
     public boolean clear(){
         if(isEmpty()) return false;
         silence();blocks.clear();
@@ -179,7 +175,5 @@ public class Board{
             blocks.add(new ArrayList<Block>());
             for(int j=0;j<width;j++) blocks.getLast().add(new Block(Block.Type.VOID,false,i,j));
         }
-        for(ArrayList<Block> i:blocks)
-            for(Block j:i) callModifyListeners(j);
     }
 }
