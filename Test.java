@@ -19,6 +19,6 @@ public class Test{
         System.out.println(tg.getValue());
     }
     public static void main(String[] args)throws Exception{
-        testOp();
+        
     }
 }
