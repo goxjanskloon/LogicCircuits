@@ -86,8 +86,8 @@ public class Board{
             switch(getType()){
             case SRC:newValue=getValue();break;
             case VOID:newValue=getInputSize()==1&&it.next().getValue();break;
-            case NOT:newValue=getInputSize()==1&&!it.next().getValue();
-            case OR:newValue=getInputSize()==2&&it.next().getValue()||it.next().getValue();break;
+            case NOT:newValue=getInputSize()==1&&!it.next().getValue();break;
+            case OR:newValue=getInputSize()==2&&(it.next().getValue()||it.next().getValue());break;
             case AND:newValue=getInputSize()==2&&it.next().getValue()&&it.next().getValue();break;
             case XOR:newValue=getInputSize()==2&&it.next().getValue()^it.next().getValue();break;
             default:break;

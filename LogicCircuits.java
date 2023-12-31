@@ -93,8 +93,9 @@ public class LogicCircuits implements Runnable{
                 switch(operationType){
                 case LINK:{
                     Board.Block block=MToBlock(me.x,me.y);
-                    if(choosedBlock==null) choosedBlock=block;
-                    else if(block!=null){choosedBlock.addOutput(block);operationType=OperationType.NONE;choosedBlock=null;}
+                    if(block!=null)
+                        if(choosedBlock==null) choosedBlock=block;
+                        else{choosedBlock.addOutput(block);operationType=OperationType.NONE;choosedBlock=null;}
                     }break;
                 case MOVE:if(!MMoved){
                     Board.Block block=MToBlock(me.x,me.y);
