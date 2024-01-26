@@ -1,25 +1,25 @@
+import java.awt.Color;
+import java.awt.Container;
+import java.awt.GraphicsConfiguration;
+import java.awt.Rectangle;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.util.Scanner;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.eclipse.swt.SWT;
-import org.eclipse.swt.events.KeyEvent;
-import org.eclipse.swt.events.KeyListener;
-import org.eclipse.swt.events.MouseEvent;
-import org.eclipse.swt.events.MouseListener;
-import org.eclipse.swt.events.MouseMoveListener;
-import org.eclipse.swt.widgets.Display;
-import org.eclipse.swt.widgets.FileDialog;
-import org.eclipse.swt.widgets.Menu;
-import org.eclipse.swt.widgets.Shell;
-import org.eclipse.swt.graphics.Color;
-import org.eclipse.swt.graphics.GC;
-import org.eclipse.swt.graphics.Image;
+import javax.swing.JFrame;
 import github.goxjanskloon.logiccircuits.Board;
 import github.goxjanskloon.logiccircuits.Board.Block;
-import github.goxjanskloon.logiccircuits.Board.ModifyListener;
-import github.goxjanskloon.swt.utils.MsgBox;
-public class LogicCircuits implements Runnable{
+class BoardUI extends JFrame{
+    Container container=null;
+    public BoardUI(String title,GraphicsConfiguration gc,Rectangle bouns){
+        super(title,gc);
+        (container=getContentPane()).setBackground(Color.WHITE);
+        setVisible(true);
+        setBounds(bouns);
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+    }
+}
+public class LogicCircuits{
     private class BoardModifyListener implements ModifyListener<BoardModifyListener>{
         private static AtomicInteger count=new AtomicInteger(0);
         public final int id=count.getAndIncrement();
@@ -41,10 +41,9 @@ public class LogicCircuits implements Runnable{
     {new Image(null,"images/XOR0.png"),new Image(null,"images/XOR1.png")},
     {new Image(null,"images/SRC0.png"),new Image(null,"images/SRC1.png")}};
     private Board board;
-    private Shell shell;
-    private Menu bar;
+    private JFrame frame;
     private int xOffset=0,yOffset=0,blockSize=50,choosedType=0,xOfsOrg=0,yOfsOrg=0;
-    private Board.Block choosedBlock=null;
+    private Block choosedBlock=null;
     private String filePath="";
     private OperationType operationType=OperationType.NONE;
     private boolean MMoved=false;
