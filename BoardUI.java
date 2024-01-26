@@ -143,7 +143,7 @@ public class BoardUI extends JFrame{
     @Override
     public void paint(Graphics g){
         g.clearRect(getX(),getY(),getWidth(),getHeight());
-        if(board.isEmpty()) return;
+        if(board==null||board.isEmpty()) return;
         int xl=-xOffset/blockSize,yl=-yOffset/blockSize,xr=xl+getWidth()/blockSize,yr=yl+getHeight()/blockSize;
         if(xl<0) xl=0;if(yl<0) yl=0;if(xr>=board.getWidth()) xr=board.getWidth()-1;if(yr>=board.getHeight()) yr=board.getHeight()-1;
         for(int i=yl;i<=yr;i++)
