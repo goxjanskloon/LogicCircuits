@@ -60,36 +60,34 @@ public class BoardUI extends JFrame{
     public BoardUI(String title,GraphicsConfiguration gc,Rectangle bounds,Board board){
         super(title,gc);
         setBackground(Color.WHITE);
-        graphics=getGraphics();
         setVisible(true);
         setBounds(bounds);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
+        graphics=getGraphics();
+        this.board=board;
         board.addModifyListener(new BlockModifyListener());
         addKeyListener(new KeyListener(){
             public void keyPressed(KeyEvent ke){
                 if(!ke.isControlDown()) return;
-                switch(ke.getKeyChar()){
-                case'n':{
+                switch(ke.getKeyCode()){
+                case'N':{
                     Scanner s=new Scanner(System.in);
                     board.resetToSize(s.nextInt(),s.nextInt());
                     s.close();repaint();}break;
-                case's':
+                case'S':
                     if(ke.isShiftDown()?saveAsFile():saveFile()) JOptionPane.showMessageDialog(BoardUI.this,"Save failed!");
                     repaint();break;
-                case'o':
+                case'O':
                     if(openFile()) JOptionPane.showMessageDialog(BoardUI.this,"Open failed!");
                     repaint();break;
-                case'l':operationType=OperationType.LINK;break;
+                case'L':operationType=OperationType.LINK;break;
                 default:{char c=ke.getKeyChar();if('1'<=c&&c<='6') choosedType=c-'1';}break;
             }}
             public void keyReleased(KeyEvent ke){}
             public void keyTyped(KeyEvent ke){}
         });
         addMouseListener(new MouseListener(){
-            public void mousePressed(MouseEvent me){}
-            public void mouseEntered(MouseEvent me){}
-            public void mouseExited(MouseEvent me){}
-            public void mouseClicked(MouseEvent me){if(!board.isEmpty()){
+            public void mousePressed(MouseEvent me){if(!board.isEmpty()){
                 switch(me.getButton()){
                 case MouseEvent.BUTTON1:
                     xOfsOrg=xOffset-me.getX();yOfsOrg=yOffset-me.getY();
@@ -99,6 +97,9 @@ public class BoardUI extends JFrame{
                 case MouseEvent.BUTTON3:operationType=OperationType.SET_TYPE;break;
                 default:break;
             }}}
+            public void mouseEntered(MouseEvent me){}
+            public void mouseExited(MouseEvent me){}
+            public void mouseClicked(MouseEvent me){}
             public void mouseReleased(MouseEvent me){
                 switch(operationType){
                 case LINK:{
@@ -159,6 +160,7 @@ public class BoardUI extends JFrame{
         JFileChooser fc=new JFileChooser();
         fc.setFileSelectionMode(JFileChooser.FILES_ONLY);
         if(fc.showOpenDialog(fc)!=JFileChooser.APPROVE_OPTION){return false;}
+        file=fc.getSelectedFile();
         FileReader reader=null;
         try{reader=new FileReader(file);
         }catch(Exception e){e.printStackTrace();return false;}
@@ -187,6 +189,7 @@ public class BoardUI extends JFrame{
         JFileChooser fc=new JFileChooser();
         fc.setFileSelectionMode(JFileChooser.FILES_ONLY);
         if(fc.showOpenDialog(fc)!=JFileChooser.APPROVE_OPTION){return false;}
+        file=fc.getSelectedFile();
         return saveFile();
     }
 }
