@@ -1,7 +1,5 @@
 import java.awt.Color;
 import java.awt.Graphics;
-import java.awt.GraphicsConfiguration;
-import java.awt.Rectangle;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.awt.event.MouseEvent;
@@ -20,7 +18,7 @@ import javax.swing.JFrame;
 import javax.swing.JOptionPane;
 import github.goxjanskloon.logiccircuits.Board;
 import github.goxjanskloon.logiccircuits.Board.Block;
-public class BoardUI extends JFrame{
+public class BoardFrame extends JFrame{
     private class BlockModifyListener implements Board.ModifyListener<BlockModifyListener>{
         private static AtomicInteger count=new AtomicInteger(0);
         public final int id=count.getAndIncrement();
@@ -57,14 +55,9 @@ public class BoardUI extends JFrame{
         {ImageIO.read(new File("img/SRC0.png")),
          ImageIO.read(new File("img/SRC1.png"))}
         };}catch(IOException e){e.printStackTrace();}}
-    public BoardUI(String title,GraphicsConfiguration gc,Rectangle bounds,Board board){
-        super(title,gc);
-        setBackground(Color.WHITE);
-        setVisible(true);
-        setBounds(bounds);
-        setDefaultCloseOperation(EXIT_ON_CLOSE);
-        graphics=getGraphics();
-        this.board=board;
+    public BoardFrame(){
+        super();
+        this.board=new Board();
         board.addModifyListener(new BlockModifyListener());
         addKeyListener(new KeyListener(){
             public void keyPressed(KeyEvent ke){
@@ -75,10 +68,10 @@ public class BoardUI extends JFrame{
                     board.resetToSize(s.nextInt(),s.nextInt());
                     s.close();repaint();}break;
                 case'S':
-                    if(ke.isShiftDown()?saveAsFile():saveFile()) JOptionPane.showMessageDialog(BoardUI.this,"Save failed!");
+                    if(ke.isShiftDown()?saveAsFile():saveFile()) JOptionPane.showMessageDialog(BoardFrame.this,"Save failed!");
                     repaint();break;
                 case'O':
-                    if(openFile()) JOptionPane.showMessageDialog(BoardUI.this,"Open failed!");
+                    if(openFile()) JOptionPane.showMessageDialog(BoardFrame.this,"Open failed!");
                     repaint();break;
                 case'L':operationType=OperationType.LINK;break;
                 default:{char c=ke.getKeyChar();if('1'<=c&&c<='6') choosedType=c-'1';}break;
@@ -128,6 +121,11 @@ public class BoardUI extends JFrame{
                     xOffset=me.getX()+xOfsOrg;yOffset=me.getY()+yOfsOrg;
                     repaint();MMoved=true;
             }}});
+    }
+    @Override
+    public void setVisible(boolean visible){
+        super.setVisible(visible);
+        if(visible) graphics=getGraphics();
     }
     private void paint(Block block){
         int x=block.x*blockSize+xOffset,y=block.y*blockSize+yOffset;
@@ -191,5 +189,13 @@ public class BoardUI extends JFrame{
         if(fc.showOpenDialog(fc)!=JFileChooser.APPROVE_OPTION){return false;}
         file=fc.getSelectedFile();
         return saveFile();
+    }
+    public static void main(String[] args){
+        BoardFrame bf=new BoardFrame();
+        bf.setTitle("LogicCircuits");
+        bf.setSize(1000,600);
+        bf.setBackground(Color.WHITE);
+        bf.setDefaultCloseOperation(EXIT_ON_CLOSE);
+        bf.setVisible(true);
     }
 }
