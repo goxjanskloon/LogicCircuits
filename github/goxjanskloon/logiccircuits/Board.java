@@ -110,7 +110,7 @@ public class Board{
     private ExecutorService threadPool=Executors.newCachedThreadPool(new ThreadFactory(){
         public Thread newThread(Runnable r){Thread thread=new Thread(r);thread.setDaemon(true);return thread;}});
     public Board(){}
-    public Board(int width,int height){resetToSize(width, height);}
+    public Board(int width,int height){resetWithSize(width, height);}
     public boolean addModifyListener(ModifyListener<?> modifyListener){return modifyListeners.add(modifyListener);}
     public boolean removeModifyListener(ModifyListener<?> modifyListener){return modifyListeners.remove(modifyListener);}
     public boolean clearModifyListeners(){
@@ -143,13 +143,8 @@ public class Board{
                 Block block=get(i,j);
                 for(int inputSize=scanner.nextInt();inputSize-->0;) block.addInput(get(scanner.nextInt(),scanner.nextInt()));
                 for(int outputSize=scanner.nextInt();outputSize-->0;) block.addOutput(get(scanner.nextInt(),scanner.nextInt()));
-            }
-        scanner.close();
-        }catch(Exception e){
-            e.printStackTrace();
-            clear();
-            return false;
-        }
+        }scanner.close();
+        }catch(Exception e){e.printStackTrace();clear();return false;}
         return true;
     }
     public boolean exportTo(Writer writer){try{
@@ -169,7 +164,7 @@ public class Board{
         }catch(Exception e){e.printStackTrace();return false;}
         return true;
     }
-    public void resetToSize(int width,int height){
+    public void resetWithSize(int width,int height){
         clear();
         for(int i=0;i<height;i++){
             blocks.add(new ArrayList<Block>());

@@ -2,11 +2,11 @@ import java.awt.Color;
 import java.awt.Graphics;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
+import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
-import java.awt.event.MouseMotionListener;
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -30,7 +30,7 @@ public class BoardFrame extends JFrame{
             paint(block);
         }
     }
-    private enum OperationType{LINK,MOVE,SET_TYPE,NONE};
+    private enum OperationType{LINK,CLEAR,SET_TYPE,NONE};
     private static BufferedImage[][] images=null;
     private static Color LINK_LC=new Color(125,125,125,125),LINK_RC=new Color(255,140,0,125);
     private Board board;
@@ -65,7 +65,7 @@ public class BoardFrame extends JFrame{
                 switch(ke.getKeyCode()){
                 case'N':{
                     Scanner s=new Scanner(System.in);
-                    board.resetToSize(s.nextInt(),s.nextInt());
+                    board.resetWithSize(s.nextInt(),s.nextInt());
                     s.close();repaint();}break;
                 case'S':
                     if(ke.isShiftDown()?saveAsFile():saveFile()) JOptionPane.showMessageDialog(BoardFrame.this,"Save failed!");
@@ -79,20 +79,15 @@ public class BoardFrame extends JFrame{
             public void keyReleased(KeyEvent ke){}
             public void keyTyped(KeyEvent ke){}
         });
-        addMouseListener(new MouseListener(){
+        addMouseListener(new MouseAdapter(){
             public void mousePressed(MouseEvent me){if(!board.isEmpty()){
                 switch(me.getButton()){
                 case MouseEvent.BUTTON1:
                     xOfsOrg=xOffset-me.getX();yOfsOrg=yOffset-me.getY();
-                    operationType=OperationType.MOVE;
-                    break;
-                case MouseEvent.BUTTON2:break;
+                    operationType=OperationType.CLEAR;break;
                 case MouseEvent.BUTTON3:operationType=OperationType.SET_TYPE;break;
                 default:break;
             }}}
-            public void mouseEntered(MouseEvent me){}
-            public void mouseExited(MouseEvent me){}
-            public void mouseClicked(MouseEvent me){}
             public void mouseReleased(MouseEvent me){
                 switch(operationType){
                 case LINK:{
@@ -101,7 +96,7 @@ public class BoardFrame extends JFrame{
                         if(choosedBlock==null) choosedBlock=block;
                         else{choosedBlock.addOutput(block);operationType=OperationType.NONE;choosedBlock=null;}
                     }break;
-                case MOVE:if(!MMoved){
+                case CLEAR:if(!MMoved){
                     Board.Block block=MToBlock(me.getX(),me.getY());
                     if(block!=null) block.clear();
                     }operationType=OperationType.NONE;MMoved=false;break;
@@ -114,13 +109,11 @@ public class BoardFrame extends JFrame{
                 case NONE:break;
                 default:operationType=OperationType.NONE;break;
         }}});
-        addMouseMotionListener(new MouseMotionListener(){
-            public void mouseDragged(MouseEvent me){}
-            public void mouseMoved(MouseEvent me){
-                if(operationType==OperationType.MOVE){
-                    xOffset=me.getX()+xOfsOrg;yOffset=me.getY()+yOfsOrg;
-                    repaint();MMoved=true;
-            }}});
+        addMouseMotionListener(new MouseAdapter(){
+            public void mouseDragged(MouseEvent me){
+                xOffset=me.getX()+xOfsOrg;yOffset=me.getY()+yOfsOrg;
+                repaint();MMoved=true;
+            }});
     }
     @Override
     public void setVisible(boolean visible){
@@ -161,27 +154,25 @@ public class BoardFrame extends JFrame{
         file=fc.getSelectedFile();
         FileReader reader=null;
         try{reader=new FileReader(file);
-        }catch(Exception e){e.printStackTrace();return false;}
+        }catch(FileNotFoundException e){e.printStackTrace();return false;}
         if(board.loadFrom(reader)){
             try{reader.close();
-            }catch(Exception e){e.printStackTrace();return false;}
+            }catch(IOException e){e.printStackTrace();return false;}
             return true;
-        }
-        try{reader.close();
-        }catch(Exception e){e.printStackTrace();return false;}
+        }try{reader.close();
+        }catch(IOException e){e.printStackTrace();return false;}
         return false;
     }
     private boolean saveFile(){
         if(file==null) return saveAsFile();
         FileWriter writer=null;
         try{writer=new FileWriter(file);
-        }catch(Exception e){e.printStackTrace();return false;}
+        }catch(IOException e){e.printStackTrace();return false;}
         if(board.exportTo(writer)){
             try{writer.close();
-            }catch(Exception e){e.printStackTrace();return false;}
+            }catch(IOException e){e.printStackTrace();return false;}
             return true;
-        }
-        return false;
+        }return false;
     }
     private boolean saveAsFile(){
         JFileChooser fc=new JFileChooser();
