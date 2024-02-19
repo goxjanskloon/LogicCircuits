@@ -1,7 +1,8 @@
 import java.awt.Color;
 import java.awt.Graphics;
+import java.awt.Image;
+import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
-import java.awt.event.KeyListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
@@ -28,38 +29,32 @@ public class BoardFrame extends JFrame{
             if(xl<0) xl=0;if(yl<0) yl=0;if(xr>=board.getWidth()) xr=board.getWidth()-1;if(yr>=board.getHeight()) yr=board.getHeight()-1;
             if(block.x<xl||xr<block.x||block.y<yl||yr<block.y) return;
             paint(block);
-        }
-    }
-    private enum OperationType{LINK,CLEAR,SET_TYPE,NONE};
-    private static BufferedImage[][] images=null;
+    }}
+    private static BufferedImage[][] IMAGES=null;
     private static Color LINK_LC=new Color(125,125,125,125),LINK_RC=new Color(255,140,0,125);
     private Board board;
     private Graphics graphics=null;
     private int xOffset=0,yOffset=0,blockSize=50,choosedType=0,xOfsOrg=0,yOfsOrg=0;
     private File file=null;
-    private OperationType operationType=OperationType.NONE;
     private Block choosedBlock=null;
-    private boolean MMoved=false;
+    private static BufferedImage readImage(String path)throws IOException{
+        return ImageIO.read(Board.class.getClassLoader().getResource(path));
+    }
     static{try{
-        images=new BufferedImage[][]{
-        {ImageIO.read(new File("img/VOID0.png")),
-         ImageIO.read(new File("img/VOID1.png"))},
-        {ImageIO.read(new File("img/OR0.png")),
-         ImageIO.read(new File("img/OR1.png"))},
-        {ImageIO.read(new File("img/NOT0.png")),
-         ImageIO.read(new File("img/NOT1.png"))},
-        {ImageIO.read(new File("img/AND0.png")),
-         ImageIO.read(new File("img/AND1.png"))},
-        {ImageIO.read(new File("img/XOR0.png")),
-         ImageIO.read(new File("img/XOR1.png"))},
-        {ImageIO.read(new File("img/SRC0.png")),
-         ImageIO.read(new File("img/SRC1.png"))}
-        };}catch(IOException e){e.printStackTrace();}}
+        IMAGES=new BufferedImage[][]{
+        {readImage("img/VOID0.png"),readImage("img/VOID1.png")},
+        {readImage("img/OR0.png"),readImage("img/OR1.png")},
+        {readImage("img/NOT0.png"),readImage("img/NOT1.png")},
+        {readImage("img/AND0.png"),readImage("img/AND1.png")},
+        {readImage("img/XOR0.png"),readImage("img/XOR1.png")},
+        {readImage("img/SRC0.png"),readImage("img/SRC1.png")}};
+        }catch(IOException e){e.printStackTrace();}}
     public BoardFrame(){
         super();
         this.board=new Board();
         board.addModifyListener(new BlockModifyListener());
-        addKeyListener(new KeyListener(){
+        addKeyListener(new KeyAdapter(){
+            @Override
             public void keyPressed(KeyEvent ke){
                 if(!ke.isControlDown()) return;
                 switch(ke.getKeyCode()){
@@ -68,62 +63,53 @@ public class BoardFrame extends JFrame{
                     board.resetWithSize(s.nextInt(),s.nextInt());
                     s.close();repaint();}break;
                 case'S':
-                    if(ke.isShiftDown()?saveAsFile():saveFile()) JOptionPane.showMessageDialog(BoardFrame.this,"Save failed!");
+                    if(ke.isShiftDown()?!saveAsFile():!saveFile()) JOptionPane.showMessageDialog(BoardFrame.this,"Save failed!");
                     repaint();break;
                 case'O':
-                    if(openFile()) JOptionPane.showMessageDialog(BoardFrame.this,"Open failed!");
+                    if(!openFile()) JOptionPane.showMessageDialog(BoardFrame.this,"Open failed!");
                     repaint();break;
-                case'L':operationType=OperationType.LINK;break;
-                default:{char c=ke.getKeyChar();if('1'<=c&&c<='6') choosedType=c-'1';}break;
-            }}
-            public void keyReleased(KeyEvent ke){}
-            public void keyTyped(KeyEvent ke){}
-        });
-        addMouseListener(new MouseAdapter(){
-            public void mousePressed(MouseEvent me){if(!board.isEmpty()){
-                switch(me.getButton()){
-                case MouseEvent.BUTTON1:
-                    xOfsOrg=xOffset-me.getX();yOfsOrg=yOffset-me.getY();
-                    operationType=OperationType.CLEAR;break;
-                case MouseEvent.BUTTON3:operationType=OperationType.SET_TYPE;break;
-                default:break;
-            }}}
-            public void mouseReleased(MouseEvent me){
-                switch(operationType){
-                case LINK:{
-                    Board.Block block=MToBlock(me.getX(),me.getY());
-                    if(block!=null)
-                        if(choosedBlock==null) choosedBlock=block;
-                        else{choosedBlock.addOutput(block);operationType=OperationType.NONE;choosedBlock=null;}
-                    }break;
-                case CLEAR:if(!MMoved){
-                    Board.Block block=MToBlock(me.getX(),me.getY());
-                    if(block!=null) block.clear();
-                    }operationType=OperationType.NONE;MMoved=false;break;
-                case SET_TYPE:if(!MMoved){
-                    Board.Block block=MToBlock(me.getX(),me.getY());
-                    if(block!=null)
-                        if(block.getType()!=Block.Type.SRC) block.setType(Block.Type.valueOf(choosedType));
-                        else block.inverseValue();
-                    }operationType=OperationType.NONE;MMoved=false;break;
-                case NONE:break;
-                default:operationType=OperationType.NONE;break;
+                case'Q':blockSize+=10;repaint();break;
+                case'E':if(blockSize>10){blockSize-=10;repaint();}break;
+                case'X':if(!board.isEmpty()){board.clear();repaint();}break;
+                default:{int c=ke.getKeyCode();if('1'<=c&&c<='6')choosedType=c-'1';}break;
         }}});
+        addMouseListener(new MouseAdapter(){
+            @Override
+            public void mousePressed(MouseEvent me){if(!board.isEmpty()){
+                xOfsOrg=xOffset-me.getX();yOfsOrg=yOffset-me.getY();}}
+            @Override
+            public void mouseClicked(MouseEvent me){if(!board.isEmpty()){
+                switch(me.getButton()){
+                case MouseEvent.BUTTON1:{
+                    Board.Block block=MToBlock(me.getX(),me.getY());
+                    if(block!=null) block.clear();}break;
+                case MouseEvent.BUTTON2:{
+                    Board.Block block=MToBlock(me.getX(),me.getY());
+                    if(choosedBlock!=null){
+                        choosedBlock.addOutput(block);
+                        
+                    }
+                }
+                case MouseEvent.BUTTON3:{
+                    Board.Block block=MToBlock(me.getX(),me.getY());if(block!=null)
+                    if(block.getType()==Block.Type.SRC) block.inverseValue();
+                    else block.setType(Block.Type.valueOf(choosedType));}break;
+                default:break;
+        }}}});
         addMouseMotionListener(new MouseAdapter(){
-            public void mouseDragged(MouseEvent me){
-                xOffset=me.getX()+xOfsOrg;yOffset=me.getY()+yOfsOrg;
-                repaint();MMoved=true;
-            }});
+            @Override
+            public void mouseDragged(MouseEvent me){if(!board.isEmpty()){
+                xOffset=me.getX()+xOfsOrg;yOffset=me.getY()+yOfsOrg;repaint();}}});
     }
     @Override
     public void setVisible(boolean visible){
         super.setVisible(visible);
         if(visible) graphics=getGraphics();
     }
-    private void paint(Block block){
+    private void paint(Block block,Graphics g){
         int x=block.x*blockSize+xOffset,y=block.y*blockSize+yOffset;
-        if(x<-blockSize||getWidth()<x||y<-blockSize||getHeight()<y);
-        graphics.drawImage(images[block.getType().ordinal()][block.getValue()?1:0],x,y,blockSize,blockSize,null);
+        if(x<-blockSize||getWidth()<=x||y<-blockSize||getHeight()<=y) return;
+        g.drawImage(IMAGES[block.getType().ordinal()][block.getValue()?1:0],x,y,blockSize,blockSize,null);
         for(Board.Block target:block.getOutputs()){
             int tx=target.x*blockSize+xOffset,ty=target.y*blockSize+yOffset,mx=x+tx>>1,my=x+ty>>1;
             graphics.setColor(LINK_LC);
@@ -132,14 +118,17 @@ public class BoardFrame extends JFrame{
             graphics.drawLine(mx,my,tx,ty);
         }
     }
+    private void paint(Block block){paint(block,graphics);}
     @Override
     public void paint(Graphics g){
-        g.clearRect(getX(),getY(),getWidth(),getHeight());
-        if(board==null||board.isEmpty()) return;
+        if(board==null||board.isEmpty()){g.clearRect(getX(),getY(),getWidth(),getHeight());return;};
+        Image image=createImage(getWidth(),getHeight());
+        Graphics ig=image.getGraphics();
         int xl=-xOffset/blockSize,yl=-yOffset/blockSize,xr=xl+getWidth()/blockSize,yr=yl+getHeight()/blockSize;
         if(xl<0) xl=0;if(yl<0) yl=0;if(xr>=board.getWidth()) xr=board.getWidth()-1;if(yr>=board.getHeight()) yr=board.getHeight()-1;
         for(int i=yl;i<=yr;i++)
-            for(int j=xl;j<=xr;j++) paint(board.get(j,i));
+            for(int j=xl;j<=xr;j++) paint(board.get(j,i),ig);
+        g.drawImage(image,0,0,null);
     }
     private Board.Block MToBlock(int x,int y){
         x-=xOffset;y-=yOffset;

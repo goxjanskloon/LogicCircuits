@@ -39,6 +39,7 @@ public class Board{
         public boolean setType(Type type){
             if(getType()==type) return false;
             this.type.set(type.ordinal());
+            this.value.set(false);
             flush();callModifyListeners(this);
             return true;
         }
@@ -67,8 +68,11 @@ public class Board{
                 output.remove(block);return false;
             }return false;
         }
-        private boolean removeInput(Block block){return input.remove(block);}
-        public boolean removeOutput(Block block){return output.remove(block);}
+        private boolean removeInput(Block block){
+            boolean res=input.remove(block);
+            if(res) callModifyListeners(this);
+            return res;
+        }
         private boolean clearInput(){
             if(input.isEmpty()) return false;
             input.clear();flush();callModifyListeners(this);
@@ -169,6 +173,5 @@ public class Board{
         for(int i=0;i<height;i++){
             blocks.add(new ArrayList<Block>());
             for(int j=0;j<width;j++) blocks.getLast().add(new Block(Block.Type.VOID,false,i,j));
-        }
-    }
+    }}
 }
