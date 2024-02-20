@@ -1,5 +1,7 @@
+import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Graphics;
+import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
@@ -31,7 +33,7 @@ public class BoardFrame extends JFrame{
             paint(block);
     }}
     private static BufferedImage[][] IMAGES=null;
-    private static Color LINK_LC=new Color(125,125,125,125),LINK_RC=new Color(255,140,0,125);
+    private static Color LINK_LC=new Color(125,125,125,64),LINK_RC=new Color(255,140,0,64);
     private Board board;
     private Graphics graphics=null;
     private int xOffset=0,yOffset=0,blockSize=50,choosedType=0,xOfsOrg=0,yOfsOrg=0;
@@ -87,9 +89,9 @@ public class BoardFrame extends JFrame{
                     Board.Block block=MToBlock(me.getX(),me.getY());
                     if(choosedBlock!=null){
                         choosedBlock.addOutput(block);
-                        
-                    }
-                }
+                        choosedBlock=null;
+                    }else choosedBlock=block;
+                }break;
                 case MouseEvent.BUTTON3:{
                     Board.Block block=MToBlock(me.getX(),me.getY());if(block!=null)
                     if(block.getType()==Block.Type.SRC) block.inverseValue();
@@ -104,14 +106,19 @@ public class BoardFrame extends JFrame{
     @Override
     public void setVisible(boolean visible){
         super.setVisible(visible);
-        if(visible) graphics=getGraphics();
+        if(visible){
+            graphics=getGraphics();
+            ((Graphics2D)graphics).setStroke(new BasicStroke(10));
+        }
     }
     private void paint(Block block,Graphics g){
         int x=block.x*blockSize+xOffset,y=block.y*blockSize+yOffset;
         if(x<-blockSize||getWidth()<=x||y<-blockSize||getHeight()<=y) return;
         g.drawImage(IMAGES[block.getType().ordinal()][block.getValue()?1:0],x,y,blockSize,blockSize,null);
+        x+=blockSize/2;y+=blockSize/2;
         for(Board.Block target:block.getOutputs()){
-            int tx=target.x*blockSize+xOffset,ty=target.y*blockSize+yOffset,mx=x+tx>>1,my=x+ty>>1;
+            int tx=target.x*blockSize+xOffset+blockSize/2,
+                ty=target.y*blockSize+yOffset+blockSize/2,mx=x+tx>>1,my=y+ty>>1;
             graphics.setColor(LINK_LC);
             graphics.drawLine(x,y,mx,my);
             graphics.setColor(LINK_RC);

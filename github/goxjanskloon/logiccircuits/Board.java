@@ -57,25 +57,33 @@ public class Board{
         public Set<Block> getOutputs(){return Collections.unmodifiableSet(output);}
         private boolean addInput(Block block){
             switch(getType()){
-            case VOID:case NOT:if(getInputSize()==1) return false;else break;
-            case OR:case AND:case XOR:if(getInputSize()==2) return false;else break;
+            case VOID:case NOT:if(getInputSize()==1)return false;else break;
+            case OR:case AND:case XOR:if(getInputSize()==2)return false;else break;
             case SRC:default:return false;
-            }input.add(block);return true;
+            }
+            boolean res=input.add(block);
+            if(res){flush();callModifyListeners(this);}
+            return res;
         }
         public boolean addOutput(Block block){
             if(output.add(block)){
-                if(block.addInput(this)){callModifyListeners(this);return true;}
+                if(block.addInput(this)){block.flush();return true;}
                 output.remove(block);return false;
             }return false;
         }
         private boolean removeInput(Block block){
             boolean res=input.remove(block);
+            if(res){flush();callModifyListeners(this);}
+            return res;
+        }
+        public boolean removeOutput(Block block){
+            boolean res=output.remove(block);
             if(res) callModifyListeners(this);
             return res;
         }
         private boolean clearInput(){
             if(input.isEmpty()) return false;
-            input.clear();flush();callModifyListeners(this);
+            input.clear();flush();
             return true;
         }
         public boolean clearOutput(){
